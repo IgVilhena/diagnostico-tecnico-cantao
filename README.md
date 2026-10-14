@@ -30,17 +30,14 @@ O programa só fecha pelo botão X da janela (Alt+F4 é bloqueado de propósito,
 
 ## Sergei Strelec WinPE
 
-Extraia o pacote `artifacts/DiagnosticoTecnico-Strelec.zip` no pendrive e abra `Iniciar-WinPE.cmd` depois de iniciar pelo Strelec. O pacote usa caminhos relativos e testes offline. A busca inclui as pastas `SSTR` das unidades montadas e os programas do WinPE. A pasta das OS é verificada para evitar salvar na unidade temporária do PE.
+Funciona igual no Strelec: copie o `DiagnosticoTecnico.exe` para o pendrive, inicie pelo Strelec e abra o `.exe` direto. Não há pacote nem instalação; na primeira vez o programa cria o `config.json` com caminhos relativos ao lado do `.exe`.
 
-O ambiente precisa de **.NET Framework 4.5 ou superior com Windows Forms**. ASP.NET e PowerShell não são necessários; dados de hardware têm alternativas para WMI indisponível. Drivers de áudio, vídeo, rede e armazenamento continuam dependendo da mídia. Veja [LEIA-ME-WINPE.txt](LEIA-ME-WINPE.txt).
+- Deixe o programa numa unidade gravável (o pendrive), não na unidade do WinPE (geralmente `X:`), que se perde ao reiniciar. O programa confere a pasta das OS e pede outra se ela for temporária.
+- A busca de programas inclui as pastas `SSTR` das unidades montadas e os programas do próprio WinPE.
+- O WinPE precisa de **.NET Framework 4.5 ou superior com Windows Forms**. Se ele faltar, abra o `Iniciar-WinPE.cmd`, que avisa o que está faltando em vez de só não abrir.
+- Áudio, webcam, Wi-Fi e bateria dependem dos drivers carregados pelo Strelec; sem eles o teste falha sem que o equipamento tenha defeito.
 
-Os testes automatizados simulam os cenários de WinPE no Windows; o boot real na mídia 2026.07.09 ainda precisa ser validado. O .NET do WinPE é um subconjunto do Framework, conforme a [referência da Microsoft](https://learn.microsoft.com/en-us/windows-hardware/manufacture/desktop/winpe-add-packages--optional-components-reference).
-
-Para gerar o pacote portátil sem incluir configurações locais, ferramentas ou dados de clientes:
-
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File build-winpe.ps1
-```
+Mais detalhes em [LEIA-ME-WINPE.txt](LEIA-ME-WINPE.txt).
 
 ## Programas de teste
 

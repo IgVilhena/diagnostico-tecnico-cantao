@@ -3,18 +3,17 @@ DIAGNÓSTICO TÉCNICO — SERGEI STRELEC WINPE
 Edição de referência: WinPE11_10_8_Sergei_Strelec_x86_x64_2026.07.09_English.
 
 COMO ABRIR
-1. Extraia DiagnosticoTecnico-Strelec.zip em uma pasta gravável do pendrive,
-   por exemplo: E:\DiagnosticoTecnico. Pode usar outro pendrive de dados.
+1. Copie DiagnosticoTecnico.exe para uma pasta gravável do pendrive,
+   por exemplo: E:\DiagnosticoTecnico.
 2. Inicie o computador pelo Strelec. Prefira WinPE 10/11 x64 para máquinas x64.
-3. Abra Iniciar-WinPE.cmd dentro da pasta extraída. Também pode abrir o .exe.
-4. Na primeira abertura, o programa busca as ferramentas disponíveis na pasta
-   Ferramentas, nas pastas SSTR das unidades montadas e nas pastas de programas
-   do WinPE em execução. Use Configurações > Procurar todos para repetir.
+3. Abra DiagnosticoTecnico.exe direto. Se ele não abrir, use Iniciar-WinPE.cmd,
+   que avisa quando falta o suporte .NET no WinPE.
+4. Na primeira abertura o programa cria o config.json ao lado do .exe e busca
+   as ferramentas na pasta Ferramentas, nas pastas SSTR das unidades montadas e
+   nos programas do WinPE em execução. Use Configurações > Procurar todos para repetir.
 5. Crie a OS e siga o fluxo normal. Fotos, JSON e PDF ficam na pasta OS.
 
-O pacote tem configuração portátil, caminhos relativos e testes offline.
-Seu config.json atual e suas OS não são incluídos nem alterados pelo empacotamento.
-Para continuar atendimentos existentes, copie sua pasta OS e, se desejado, seu
+Para continuar atendimentos existentes, copie sua pasta OS e, se quiser, seu
 config.json para o pendrive. Confira caminhos absolutos: a letra pode mudar no PE.
 
 ARQUIVOS E PERSISTÊNCIA
@@ -56,14 +55,12 @@ FERRAMENTAS E TESTES
   como funcionando apenas porque o diagnóstico abriu.
 
 VALIDAÇÃO
-Compilação e testes automatizados executados no Windows: interface, teclado,
-JSON/configurações/OS, exportação, PDF, descoberta x86/x64 e falhas de WMI.
-O cenário WinPE nos testes é simulado. Esta entrega ainda precisa ser validada
-por boot real na sua mídia Strelec 2026.07.09, com os drivers da máquina.
+Abertura conferida no Strelec executando o DiagnosticoTecnico.exe direto.
+Os testes automatizados também simulam no Windows os cenários de WinPE
+(falta de WMI, descoberta x86/x64, pasta temporária).
 
-Conferência no Strelec:
-  - abrir Iniciar-WinPE.cmd e criar uma OS de teste;
-  - conferir pasta das OS no pendrive e ferramentas encontradas;
+Vale conferir no Strelec, com os drivers da máquina:
+  - criar uma OS de teste e conferir a pasta das OS no pendrive;
   - testar teclado e capturas F8/F9;
   - exportar JSON e gerar PDF;
   - fechar, reiniciar e confirmar que a OS continua no pendrive.
