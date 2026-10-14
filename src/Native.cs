@@ -40,6 +40,17 @@ namespace Diagnostico
         [DllImport("user32.dll", CharSet = CharSet.Unicode)] public static extern int GetWindowText(IntPtr hWnd, StringBuilder sb, int max);
         [DllImport("user32.dll")] public static extern bool SetProcessDPIAware();
 
+        [StructLayout(LayoutKind.Sequential)]
+        public struct MEMORYSTATUSEX
+        {
+            public uint Length, MemoryLoad;
+            public ulong TotalPhysical, AvailablePhysical, TotalPageFile, AvailablePageFile, TotalVirtual, AvailableVirtual, AvailableExtendedVirtual;
+        }
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        public static extern bool GlobalMemoryStatusEx(ref MEMORYSTATUSEX status);
+
         [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
         public struct DEVMODE
         {

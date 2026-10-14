@@ -17,7 +17,7 @@ if exist "src\app.ico" set ICON=/win32icon:src\app.ico
 "%CSC%" /nologo /target:winexe /platform:anycpu /optimize+ /codepage:65001 ^
   /out:DiagnosticoTecnico.exe /win32manifest:src\app.manifest %ICON% ^
   /r:System.dll /r:System.Core.dll /r:System.Drawing.dll /r:System.Windows.Forms.dll ^
-  /r:System.Management.dll /r:System.Web.Extensions.dll ^
+  /r:System.Management.dll /r:System.Runtime.Serialization.dll /r:System.Xml.dll ^
   /resource:assets\cantao-logo.jpeg,Cantao.Logo /resource:assets\cantao-fundo.jpg,Cantao.Fundo ^
   src\*.cs
 if errorlevel 1 (

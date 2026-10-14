@@ -1,0 +1,77 @@
+DIAGNÓSTICO TÉCNICO — SERGEI STRELEC WINPE
+========================================
+Edição de referência: WinPE11_10_8_Sergei_Strelec_x86_x64_2026.07.09_English.
+
+COMO ABRIR
+1. Extraia DiagnosticoTecnico-Strelec.zip em uma pasta gravável do pendrive,
+   por exemplo: E:\DiagnosticoTecnico. Pode usar outro pendrive de dados.
+2. Inicie o computador pelo Strelec. Prefira WinPE 10/11 x64 para máquinas x64.
+3. Abra Iniciar-WinPE.cmd dentro da pasta extraída. Também pode abrir o .exe.
+4. Na primeira abertura, o programa busca as ferramentas disponíveis na pasta
+   Ferramentas, nas pastas SSTR das unidades montadas e nas pastas de programas
+   do WinPE em execução. Use Configurações > Procurar todos para repetir.
+5. Crie a OS e siga o fluxo normal. Fotos, JSON e PDF ficam na pasta OS.
+
+O pacote tem configuração portátil, caminhos relativos e testes offline.
+Seu config.json atual e suas OS não são incluídos nem alterados pelo empacotamento.
+Para continuar atendimentos existentes, copie sua pasta OS e, se desejado, seu
+config.json para o pendrive. Confira caminhos absolutos: a letra pode mudar no PE.
+
+ARQUIVOS E PERSISTÊNCIA
+- Mantenha o programa e os dados em uma unidade gravável, fora da unidade do
+  WinPE (geralmente X:). Essa unidade é temporária e se perde ao reiniciar.
+- Ao iniciar no WinPE, o programa verifica se a pasta das OS aceita gravação
+  e pede outra pasta quando a configurada está indisponível ou é temporária.
+- Evite executar diretamente de uma ISO, CD ou pasta protegida: configurações
+  e erro.log precisam de uma pasta gravável ao lado do executável.
+- O programa não monta nem altera a instalação de Windows do cliente.
+
+REQUISITOS
+- .NET Framework 4.5 ou superior, com Windows Forms, System.Drawing,
+  System.Xml e System.Runtime.Serialization, carregado no WinPE da mesma
+  arquitetura. O executável AnyCPU roda como x86 no PE x86 e x64 no PE x64.
+- O iniciador verifica a presença básica do CLR; isso não garante que todos
+  os componentes estejam carregados. Se faltar suporte .NET, carregue o
+  componente fornecido pela sua mídia Strelec, se disponível. Caso contrário,
+  use uma imagem WinPE que inclua WinPE-NetFX e suas dependências.
+- Não basta ter .NET no Windows instalado no SSD. Não copie DLLs avulsas do
+  Windows instalado para tentar completar o ambiente WinPE.
+- PowerShell e ASP.NET/System.Web não são necessários para executar o app.
+- WMI é usado quando disponível. CPU, RAM, fabricante e modelo têm leitura
+  alternativa; informações que o PE não fornece ficam indisponíveis.
+
+FERRAMENTAS E TESTES
+- Ferramentas de terceiros não acompanham este pacote. Podem vir da própria
+  mídia Strelec ou ser colocadas em Ferramentas. Não são baixadas pelo app.
+- A busca considera HWiNFO32/64 e DiskInfo32/64. Uma versão x64 não é escolhida
+  no PE x86. Ferramentas compactadas precisam estar extraídas/montadas para
+  serem encontradas; também é possível usar Configurações > Localizar.
+- Áudio, microfone, webcam, Wi-Fi, bateria, GPU e controladoras de disco
+  dependem dos drivers e serviços carregados no PE. A falta deles não comprova
+  defeito no equipamento. Carregue os drivers pelo Strelec e repita o teste.
+- FurMark, Cinebench e Superposition podem exigir componentes que não estão
+  no PE. Se não executarem, faça esses testes no Windows completo.
+- Os testes online precisam de rede e navegador associado a URLs no WinPE.
+- O laudo identifica o ambiente como WinPE e não marca o Windows instalado
+  como funcionando apenas porque o diagnóstico abriu.
+
+VALIDAÇÃO
+Compilação e testes automatizados executados no Windows: interface, teclado,
+JSON/configurações/OS, exportação, PDF, descoberta x86/x64 e falhas de WMI.
+O cenário WinPE nos testes é simulado. Esta entrega ainda precisa ser validada
+por boot real na sua mídia Strelec 2026.07.09, com os drivers da máquina.
+
+Conferência no Strelec:
+  - abrir Iniciar-WinPE.cmd e criar uma OS de teste;
+  - conferir pasta das OS no pendrive e ferramentas encontradas;
+  - testar teclado e capturas F8/F9;
+  - exportar JSON e gerar PDF;
+  - fechar, reiniciar e confirmar que a OS continua no pendrive.
+Se houver erro, anote a mensagem, o WinPE selecionado (8/10/11, x86/x64)
+e consulte erro.log na pasta do aplicativo.
+
+REFERÊNCIAS
+Componentes opcionais WinPE e limitações do .NET/WMI:
+https://learn.microsoft.com/en-us/windows-hardware/manufacture/desktop/winpe-add-packages--optional-components-reference
+Histórico oficial da mídia (inclui a edição 2026.07.09):
+https://sergeistrelec.name/version_history_en_new.html

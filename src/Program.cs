@@ -14,6 +14,20 @@ namespace Diagnostico
         [STAThread]
         static void Main()
         {
+            try { Run(); }
+            catch (Exception ex)
+            {
+                Log.Write("Falha na inicialização: " + ex);
+                MessageBox.Show("Não foi possível iniciar o Diagnóstico Técnico.\n\n" + ex.Message +
+                    "\n\nNo Strelec, verifique se o suporte .NET 4.5 ou superior está carregado. Consulte LEIA-ME-WINPE.txt e erro.log.",
+                    "Diagnóstico Técnico", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                Environment.ExitCode = 1;
+            }
+        }
+
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+        static void Run()
+        {
             bool created;
             using (var mutex = new Mutex(true, "DiagnosticoTecnico_SingleInstance", out created))
             {
@@ -43,6 +57,13 @@ namespace Diagnostico
                 if (fit < 1f) Theme.Scale *= Math.Max(0.72f, fit);
 
                 Session.Cfg = AppConfig.Load();
+                if (SystemInfo.IsWinPE)
+                {
+                    Log.Write("Ambiente WinPE " + (Environment.Is64BitOperatingSystem ? "x64" : "x86") + "; CLR " + Environment.Version);
+                    if (!WinPeSupport.PrepareStorage(Session.Cfg)) return;
+                    ToolDiscovery.FindMissing(Session.Cfg, ToolDiscovery.Executables(ToolDiscovery.SearchRoots(Session.Cfg)), Environment.Is64BitOperatingSystem);
+                    Session.Cfg.Save();
+                }
                 Theme.Configure(Session.Cfg);
 #if SNAP
                 // Build de teste: renderiza cada tela em PNG e sai.

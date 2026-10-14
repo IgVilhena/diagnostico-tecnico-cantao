@@ -27,7 +27,7 @@ namespace Diagnostico
 
         public MainForm()
         {
-            Text = "Cantão · Diagnóstico Técnico";
+            Text = "Cantão · Diagnóstico Técnico" + (SystemInfo.IsWinPE ? " · WinPE" : "");
             FormBorderStyle = FormBorderStyle.None;
             BackColor = Theme.Bg;
             ForeColor = Theme.Text;
@@ -55,7 +55,8 @@ namespace Diagnostico
 
             Go(PageHome);
             UpdateNavigation();
-            Microsoft.Win32.SystemEvents.UserPreferenceChanged += SystemThemeChanged;
+            try { Microsoft.Win32.SystemEvents.UserPreferenceChanged += SystemThemeChanged; }
+            catch (Exception ex) { Log.Write("Tema automático indisponível: " + ex.Message); }
         }
 
         public void ApplyAppearance()
@@ -172,7 +173,7 @@ namespace Diagnostico
 
         protected override void OnFormClosed(FormClosedEventArgs e)
         {
-            Microsoft.Win32.SystemEvents.UserPreferenceChanged -= SystemThemeChanged;
+            try { Microsoft.Win32.SystemEvents.UserPreferenceChanged -= SystemThemeChanged; } catch { }
             Native.UnregisterHotKey(Handle, 1);
             Native.UnregisterHotKey(Handle, 2);
             var p = current as IPage;

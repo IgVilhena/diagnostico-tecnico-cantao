@@ -155,6 +155,13 @@ namespace Diagnostico
                     return;
                 }
 
+                if (!ToolDiscovery.Compatible(t.FullPath, Environment.Is64BitOperatingSystem))
+                {
+                    Toast.Show(t.Nome + ": executável incompatível com este ambiente. Use uma versão " +
+                        (Environment.Is64BitOperatingSystem ? "x64 ou x86" : "x86 (32 bits)") + ".", true);
+                    return;
+                }
+
                 var existing = MainWindowOf(t);
                 if (existing != IntPtr.Zero)
                 {

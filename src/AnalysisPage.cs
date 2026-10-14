@@ -538,7 +538,7 @@ namespace Diagnostico
             entries.Clear();
             entries.Add(new Entry { Label = "SAÚDE DOS COMPONENTES", Header = true });
             foreach (var d in m.Discos) Add(d.Title, d.Value, DotFor(d.Status));
-            if (m.Discos.Count == 0) Add("Discos", "Nenhum disco encontrado");
+            if (m.Discos.Count == 0) Add("Discos", SystemInfo.IsWinPE ? "Leitura indisponível; confira drivers e CrystalDiskInfo" : "Nenhum disco encontrado");
             Add("Saúde da bateria", m.BateriaValor, m.BateriaPercent >= 0 ? DotFor(m.BateriaTexto) : Color.Empty);
             entries.Add(new Entry { Label = "ESPECIFICAÇÃO", Header = true });
             Add("Modelo", (m.Fabricante + " " + m.Modelo).Trim());

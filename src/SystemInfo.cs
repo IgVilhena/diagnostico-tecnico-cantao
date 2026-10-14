@@ -72,22 +72,40 @@ namespace Diagnostico
             catch { return false; }
         }
 
-        static IEnumerable<ManagementObject> Query(string scope, string wql)
+        static bool wmiWarningLogged;
+
+        static List<Dictionary<string, object>> Query(string scope, string wql)
         {
-            var list = new List<ManagementObject>();
-            try
+            try { return QueryWmi(scope, wql); }
+            catch (Exception ex)
             {
-                using (var s = new ManagementObjectSearcher(scope, wql))
-                using (var res = s.Get())
-                    foreach (ManagementObject o in res) list.Add(o);
+                if (!wmiWarningLogged) { Log.Write("WMI indisponível ou incompleto: " + ex.Message); wmiWarningLogged = true; }
+                return new List<Dictionary<string, object>>();
             }
-            catch { }
+        }
+
+        // Se System.Management não estiver presente, a falha de carregamento é capturada em Query.
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+        static List<Dictionary<string, object>> QueryWmi(string scope, string wql)
+        {
+            var list = new List<Dictionary<string, object>>();
+            var options = new EnumerationOptions { Timeout = TimeSpan.FromSeconds(3), ReturnImmediately = false };
+            using (var searcher = new ManagementObjectSearcher(scope, wql, options))
+            using (var result = searcher.Get())
+                foreach (ManagementObject obj in result)
+                    using (obj)
+                    {
+                        var row = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
+                        foreach (PropertyData property in obj.Properties) row[property.Name] = property.Value;
+                        list.Add(row);
+                    }
             return list;
         }
 
-        static string Str(ManagementObject o, string prop)
+        static string Str(Dictionary<string, object> o, string prop)
         {
-            try { var v = o[prop]; return v == null ? "" : v.ToString().Trim(); } catch { return ""; }
+            object value;
+            return o.TryGetValue(prop, out value) && value != null ? value.ToString().Trim() : "";
         }
 
         static string First(string cls, string prop, string scope = @"root\cimv2")
@@ -127,11 +145,34 @@ namespace Diagnostico
             if (ram == 0) long.TryParse(First("Win32_ComputerSystem", "TotalPhysicalMemory"), out ram);
             if (ram > 0) m.Memoria = Math.Round(ram / 1073741824.0) + " GB";
 
+            ApplyFallbacks(m);
             ReadDisplay(m);
             ReadBattery(m);
-            m.Tipo = ChassisType(m.BateriaPercent >= 0 || m.BateriaTexto != "");
+            m.Tipo = ChassisType(m.BateriaPercent >= 0 || m.BateriaTexto.StartsWith("presente"));
             ReadDisks(m);
             return m;
+        }
+
+        static string RegistryValue(string path, string name)
+        {
+            try { using (var key = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(path)) return key == null ? "" : Convert.ToString(key.GetValue(name, "")).Trim(); }
+            catch { return ""; }
+        }
+
+        internal static void ApplyFallbacks(MachineInfo m)
+        {
+            const string bios = @"HARDWARE\DESCRIPTION\System\BIOS";
+            if (Junk(m.Fabricante)) m.Fabricante = RegistryValue(bios, "SystemManufacturer");
+            if (Junk(m.Modelo)) m.Modelo = RegistryValue(bios, "SystemProductName");
+            if (string.IsNullOrWhiteSpace(m.Processador)) m.Processador = RegistryValue(@"HARDWARE\DESCRIPTION\System\CentralProcessor\0", "ProcessorNameString");
+            if (string.IsNullOrWhiteSpace(m.Memoria))
+            {
+                var memory = new Native.MEMORYSTATUSEX();
+                memory.Length = (uint)System.Runtime.InteropServices.Marshal.SizeOf(typeof(Native.MEMORYSTATUSEX));
+                if (Native.GlobalMemoryStatusEx(ref memory)) m.Memoria = Math.Round(memory.TotalPhysical / 1073741824.0) + " GB";
+            }
+            if (IsWinPE) m.Sistema = "WinPE (ambiente de diagnóstico; Windows instalado não avaliado)";
+            else if (string.IsNullOrWhiteSpace(m.Sistema)) m.Sistema = Environment.OSVersion.VersionString;
         }
 
         // 59 Hz é como o Windows informa 59,94 Hz; 143 -> 144 etc.
@@ -176,7 +217,8 @@ namespace Diagnostico
         {
             foreach (var o in Query(@"root\cimv2", "SELECT ChassisTypes FROM Win32_SystemEnclosure"))
             {
-                var arr = o["ChassisTypes"] as ushort[];
+                object value;
+                var arr = o.TryGetValue("ChassisTypes", out value) ? value as ushort[] : null;
                 if (arr == null) continue;
                 foreach (var t in arr)
                 {
@@ -186,7 +228,7 @@ namespace Diagnostico
                     if (new ushort[] { 3, 4, 5, 6, 7, 15, 16, 35, 36 }.Contains(t)) return "desktop";
                 }
             }
-            return hasBattery ? "notebook" : "desktop";
+            return hasBattery ? "notebook" : IsWinPE ? "Não identificado" : "desktop";
         }
 
         static void ReadBattery(MachineInfo m)
@@ -203,6 +245,8 @@ namespace Diagnostico
             }
             else if (Query(@"root\cimv2", "SELECT Name FROM Win32_Battery").Any())
                 m.BateriaTexto = "presente (sem dados de desgaste)";
+            else if (IsWinPE)
+                m.BateriaTexto = "Não disponível no WinPE (verifique driver/bateria)";
         }
 
         // ---------- discos ----------

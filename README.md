@@ -2,7 +2,7 @@
 
 Programa de bancada para análise e triagem de notebooks e computadores. Guia o técnico pelas etapas do diagnóstico, tira os prints já com o nome padronizado, registra os testes funcionais e gera o laudo em PDF.
 
-Roda direto de um pendrive, sem instalação, em Windows 10/11.
+Roda direto de um pendrive, sem instalação, em Windows 10/11. Inclui adaptações para o Sergei Strelec WinPE (edição de referência: 2026.07.09, x86/x64).
 
 ![Tela Fazer análise](docs/tela-analise.png)
 
@@ -27,6 +27,20 @@ Roda direto de um pendrive, sem instalação, em Windows 10/11.
 Na primeira execução o programa cria o `config.json` ao lado do `.exe`, com as pastas, etapas e preferências. O passo a passo completo está no [LEIA-ME.txt](LEIA-ME.txt).
 
 O programa só fecha pelo botão X da janela (Alt+F4 é bloqueado de propósito, para não fechar no meio de um teste).
+
+## Sergei Strelec WinPE
+
+Extraia o pacote `artifacts/DiagnosticoTecnico-Strelec.zip` no pendrive e abra `Iniciar-WinPE.cmd` depois de iniciar pelo Strelec. O pacote usa caminhos relativos e testes offline. A busca inclui as pastas `SSTR` das unidades montadas e os programas do WinPE. A pasta das OS é verificada para evitar salvar na unidade temporária do PE.
+
+O ambiente precisa de **.NET Framework 4.5 ou superior com Windows Forms**. ASP.NET e PowerShell não são necessários; dados de hardware têm alternativas para WMI indisponível. Drivers de áudio, vídeo, rede e armazenamento continuam dependendo da mídia. Veja [LEIA-ME-WINPE.txt](LEIA-ME-WINPE.txt).
+
+Os testes automatizados simulam os cenários de WinPE no Windows; o boot real na mídia 2026.07.09 ainda precisa ser validado. O .NET do WinPE é um subconjunto do Framework, conforme a [referência da Microsoft](https://learn.microsoft.com/en-us/windows-hardware/manufacture/desktop/winpe-add-packages--optional-components-reference).
+
+Para gerar o pacote portátil sem incluir configurações locais, ferramentas ou dados de clientes:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File build-winpe.ps1
+```
 
 ## Programas de teste
 
@@ -77,5 +91,5 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tests\run.ps1
 
 ## Requisitos
 
-- Windows 10 ou 11, ou WinPE com .NET Framework 4.x
+- Windows 10 ou 11, ou WinPE com .NET Framework 4.5 ou superior e Windows Forms
 - Internet apenas para os testes online (teclado e webcam por site)

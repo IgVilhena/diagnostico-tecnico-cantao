@@ -4,7 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
-using System.Web.Script.Serialization;
+using System.Runtime.Serialization;
 using System.Windows.Forms;
 
 namespace Diagnostico
@@ -40,7 +40,7 @@ namespace Diagnostico
             return new ToolConfig { Nome = nome, Exe = exe, Arquivo = arquivo, Descricao = desc };
         }
 
-        [ScriptIgnore]
+        [IgnoreDataMember]
         public string ProcessName
         {
             get
@@ -51,16 +51,16 @@ namespace Diagnostico
             }
         }
 
-        [ScriptIgnore] public bool IsUrl { get { return Exe != null && Regex.IsMatch(Exe.Trim(), "^https?://", RegexOptions.IgnoreCase); } }
+        [IgnoreDataMember] public bool IsUrl { get { return Exe != null && Regex.IsMatch(Exe.Trim(), "^https?://", RegexOptions.IgnoreCase); } }
         // Teste embutido no programa (offline): interno:teclado, interno:audio
-        [ScriptIgnore] public bool IsInternal { get { return Exe != null && Exe.Trim().StartsWith(InternalTests.Prefix, StringComparison.OrdinalIgnoreCase); } }
+        [IgnoreDataMember] public bool IsInternal { get { return Exe != null && Exe.Trim().StartsWith(InternalTests.Prefix, StringComparison.OrdinalIgnoreCase); } }
         // Teste interno que tem um site equivalente (hoje só o teclado; o de áudio testa os alto-falantes, que não têm versão online)
-        [ScriptIgnore] public bool HasOnlineVersion { get { return IsInternal && Exe.Trim().Substring(InternalTests.Prefix.Length).Equals("teclado", StringComparison.OrdinalIgnoreCase); } }
-        [ScriptIgnore] public string FullPath { get { return IsUrl || IsInternal ? Exe.Trim() : AppPaths.Resolve(Exe); } }
-        [ScriptIgnore] public bool Exists { get { try { return IsUrl || IsInternal || (!string.IsNullOrWhiteSpace(Exe) && File.Exists(FullPath)); } catch { return false; } } }
+        [IgnoreDataMember] public bool HasOnlineVersion { get { return IsInternal && Exe.Trim().Substring(InternalTests.Prefix.Length).Equals("teclado", StringComparison.OrdinalIgnoreCase); } }
+        [IgnoreDataMember] public string FullPath { get { return IsUrl || IsInternal ? Exe.Trim() : AppPaths.Resolve(Exe); } }
+        [IgnoreDataMember] public bool Exists { get { try { return IsUrl || IsInternal || (!string.IsNullOrWhiteSpace(Exe) && File.Exists(FullPath)); } catch { return false; } } }
 
         // Código usado no nome do arquivo: OS_<numero>_<Codigo>.png
-        [ScriptIgnore]
+        [IgnoreDataMember]
         public string Codigo
         {
             get
@@ -225,8 +225,8 @@ namespace Diagnostico
             Versao = VersaoAtual;
         }
 
-        [ScriptIgnore] public string OsRoot { get { return AppPaths.Resolve(PastaOS); } }
-        [ScriptIgnore] public string ToolsRoot { get { return AppPaths.Resolve(PastaProgramas); } }
+        [IgnoreDataMember] public string OsRoot { get { return AppPaths.Resolve(PastaOS); } }
+        [IgnoreDataMember] public string ToolsRoot { get { return AppPaths.Resolve(PastaProgramas); } }
 
         public static string FilePath { get { return Path.Combine(AppPaths.AppDir, "config.json"); } }
 
@@ -305,9 +305,9 @@ namespace Diagnostico
 
     static class Json
     {
-        public static readonly JavaScriptSerializer Serializer = new JavaScriptSerializer { MaxJsonLength = int.MaxValue };
+        public static readonly PortableJsonSerializer Serializer = new PortableJsonSerializer();
 
-        // Indenta o JSON gerado pelo JavaScriptSerializer e desfaz escapes desnecessários (<, >, &, ').
+        // Indenta o JSON gerado pelo serializador e desfaz escapes desnecessários (<, >, &, ').
         public static string Pretty(string json)
         {
             json = json.Replace("\\u003c", "<").Replace("\\u003e", ">").Replace("\\u0026", "&").Replace("\\u0027", "'");

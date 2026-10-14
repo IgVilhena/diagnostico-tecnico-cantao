@@ -55,7 +55,8 @@ Observações:
   - Etapas, nomes dos arquivos, fotos, testes e itens da comparação são editáveis
     (Configurações ou config.json).
 
-Requisitos: Windows 10/11 ou WinPE com .NET Framework 4.x (ex.: Sergei Strelec).
+Requisitos: Windows 10/11 ou WinPE com .NET Framework 4.5+ e Windows Forms.
+Sergei Strelec 2026.07.09: consulte LEIA-ME-WINPE.txt e abra Iniciar-WinPE.cmd.
 O programa pede administrador (necessário para CrystalDiskInfo/HWiNFO).
 Só fecha pelo botão X da janela.
 

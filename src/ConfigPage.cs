@@ -155,34 +155,24 @@ namespace Diagnostico
         }
 
         // Procura cada executável (pelo nome do arquivo) dentro da pasta dos programas.
-        void FindAll()
+        async void FindAll()
         {
-            string root = Session.Cfg.ToolsRoot;
-            if (!Directory.Exists(root)) { Toast.Show("Pasta dos programas não existe: " + root, true); return; }
             Cursor = Cursors.WaitCursor;
-            var files = new List<string>();
-            try { files = Directory.GetFiles(root, "*.exe", SearchOption.AllDirectories).ToList(); } catch (Exception ex) { Toast.Show(ex.Message, true); }
-            int found = 0, missing = 0;
-            foreach (var t in Session.Cfg.Programas)
+            findAll.Enabled = false;
+            try
             {
-                if (t.Exists) { found++; continue; }
-                string fname = Path.GetFileName(t.Exe ?? "");
-                string hit = files.FirstOrDefault(f => string.Equals(Path.GetFileName(f), fname, StringComparison.OrdinalIgnoreCase));
-                if (hit == null)
-                {
-                    // tenta pelo nome do programa (ex.: "HD Sentinel" -> HDSentinel*.exe)
-                    string key = new string((t.Nome ?? "").Where(char.IsLetterOrDigit).ToArray()).ToLowerInvariant();
-                    if (key.Length >= 3)
-                        hit = files.Where(f => new string(Path.GetFileNameWithoutExtension(f).Where(char.IsLetterOrDigit).ToArray()).ToLowerInvariant().StartsWith(key))
-                                   .OrderBy(f => f.Contains("64") ? 0 : 1).FirstOrDefault();
-                }
-                if (hit != null) { t.Exe = AppPaths.ToRelative(hit); found++; } else missing++;
+                var roots = ToolDiscovery.SearchRoots(Session.Cfg).ToList();
+                var files = await System.Threading.Tasks.Task.Run(() => ToolDiscovery.Executables(roots));
+                if (IsDisposed) return;
+                int found = ToolDiscovery.FindMissing(Session.Cfg, files, Environment.Is64BitOperatingSystem);
+                int missing = Session.Cfg.Programas.Count - found;
+                Session.Cfg.Save();
+                RefreshList();
+                if (current != null) ShowTool(current);
+                Toast.Show(found + " encontrado(s), " + missing + " não encontrado(s).", missing > 0);
             }
-            Cursor = Cursors.Default;
-            Session.Cfg.Save();
-            RefreshList();
-            if (current != null) ShowTool(current);
-            Toast.Show(found + " encontrado(s), " + missing + " não encontrado(s).", missing > 0);
+            catch (Exception ex) { Toast.Show("Erro na busca: " + ex.Message, true); }
+            finally { if (!IsDisposed) { Cursor = Cursors.Default; findAll.Enabled = true; } }
         }
 
         void Add()
