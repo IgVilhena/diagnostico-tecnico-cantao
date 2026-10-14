@@ -284,13 +284,12 @@ namespace Diagnostico
 
         static string Translate(string s)
         {
-            switch (s.ToLowerInvariant())
-            {
-                case "good": return "Bom";
-                case "caution": return "Atenção";
-                case "bad": return "Ruim";
-                default: return "Desconhecido";
-            }
+            // O DiskInfo.txt sai no idioma do CrystalDiskInfo: "Good" em inglês, "Saudável" em português...
+            string t = s.ToLowerInvariant();
+            if (t == "good" || t.StartsWith("saud") || t == "bom" || t == "boa") return "Bom";
+            if (t == "caution" || t.StartsWith("aten") || t == "cuidado") return "Atenção";
+            if (t == "bad" || t == "ruim") return "Ruim";
+            return "Desconhecido";
         }
 
         static List<DiskHealth> DisksFromWmi()

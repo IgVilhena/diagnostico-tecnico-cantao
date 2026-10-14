@@ -51,6 +51,9 @@ namespace Diagnostico
 
         readonly Timer statusTimer = new Timer { Interval = 1000 };
         readonly Timer loadTimer = new Timer { Interval = 700 };
+        // Salvamento automático da OS: no máximo 15 s depois da primeira alteração ainda não gravada
+        readonly Timer saveTimer = new Timer { Interval = 15000 };
+        bool dirty;
         static readonly string[] Answers = { "sim", "nao", "nao_tem" };
 
         public AnalysisPage()
@@ -89,8 +92,15 @@ namespace Diagnostico
             progList.RowClick += (s, i) => { var t = progList.Rows[i].Tag as ToolConfig; if (t != null) { Session.Launch(t); RefreshPrograms(); } };
             progList.RowRightClick += (s, i) => ToolMenu(progList.Rows[i].Tag as ToolConfig);
 
-            osNumber.ValueChanged += (s, e) => { Session.ActiveFolder = Session.FolderForOs(osNumber.Text); loadTimer.Stop(); loadTimer.Start(); RefreshPrograms(); };
+            osNumber.ValueChanged += (s, e) =>
+            {
+                SaveAnswers();   // o que estava pendente pertence à OS anterior: grava antes de trocar
+                Session.ActiveFolder = Session.FolderForOs(osNumber.Text); loadTimer.Stop(); loadTimer.Start(); RefreshPrograms();
+            };
             loadTimer.Tick += (s, e) => { loadTimer.Stop(); LoadExisting(); };
+            saveTimer.Tick += (s, e) => SaveAnswers();
+            cliente.ValueChanged += (s, e) => MarkDirty();
+            tecnico.ValueChanged += (s, e) => MarkDirty();
             statusTimer.Tick += (s, e) => RefreshPrograms();
 
             refresh.Click += async (s, e) => { machineTask = null; await LoadMachine(); };
@@ -103,7 +113,7 @@ namespace Diagnostico
             {
                 foreach (var t in tests)
                     if (LaudoExport.Normalize(t.Item1.Text) == LaudoExport.Normalize(name)) t.Item2.SelectedIndex = answer;
-                StoreAnswers();
+                MarkDirty();
             };
 
             BuildTests();
@@ -130,6 +140,7 @@ namespace Diagnostico
             {
                 var lbl = UI.Label(name, Theme.Body, Theme.Text);
                 var seg = new Segmented("Sim", "Não", "Não Tem") { BackColor = Theme.Panel };
+                seg.SelectedChanged += (s, e) => MarkDirty();   // só cliques e teclado; mudanças do código não disparam
                 tests.Add(Tuple.Create(lbl, seg));
                 testRows.Controls.Add(lbl);
                 testRows.Controls.Add(seg);
@@ -150,6 +161,40 @@ namespace Diagnostico
             var d = answers[Session.Depois ? 1 : 0];
             d.Clear();
             foreach (var t in tests) if (t.Item2.SelectedIndex >= 0) d[t.Item1.Text] = t.Item2.SelectedIndex;
+        }
+
+        // Grava as marcações no JSON da OS a cada clique, para não se perderem se o programa fechar antes do
+        // "Exportar JSON". Só mexe em "testes"/"testes_depois"; o resto do arquivo é preservado.
+        // Marca que há algo a gravar; o salvamento acontece até 15 s depois (cliques seguidos não adiam).
+        void MarkDirty()
+        {
+            StoreAnswers();
+            dirty = true;
+            if (!saveTimer.Enabled) saveTimer.Start();
+        }
+
+        // Grava o que está pendente (também chamado ao trocar de OS, sair da tela e fechar o programa).
+        void SaveAnswers()
+        {
+            saveTimer.Stop();
+            if (!dirty) return;
+            StoreAnswers();
+            var folder = Session.ActiveFolder;
+            // Sem OS ainda, ou OS recém-digitada com dados gravados para carregar: tenta de novo daqui a 15 s
+            if (folder == null || loadTimer.Enabled) { saveTimer.Start(); return; }
+            try
+            {
+                var d = OsJson.Load(folder);
+                if (!d.ContainsKey("os")) d["os"] = Path.GetFileName(folder);
+                if (cliente.Text.Trim() != "") d["cliente"] = cliente.Text.Trim();
+                if (tecnico.Text.Trim() != "") d["tecnico"] = tecnico.Text.Trim();
+                d["testes"] = AnswersJson(0);
+                d["testes_depois"] = AnswersJson(1);
+                OsJson.Save(folder, d);
+                dirty = false;
+                answersFromFile = true;   // agora pertencem a esta OS: trocar de OS não as leva junto
+            }
+            catch (Exception ex) { Log.Write("Erro ao salvar a OS automaticamente: " + ex.Message); }
         }
 
         void ShowAnswers()
@@ -175,7 +220,7 @@ namespace Diagnostico
             BeginInvoke(new Action(() => osNumber.Box.Focus()));
         }
 
-        public void OnLeave() { statusTimer.Stop(); StoreAnswers(); }
+        public void OnLeave() { statusTimer.Stop(); StoreAnswers(); SaveAnswers(); }
 
         protected override void OnLayout(LayoutEventArgs e)
         {
@@ -440,17 +485,20 @@ namespace Diagnostico
                                               answers[0], answers[1], final, OsJson.Str(d, "observacoes"));
                 if (tecnico.Text.Trim() != "" && tecnico.Text.Trim() != Session.Cfg.Tecnico) { Session.Cfg.Tecnico = tecnico.Text.Trim(); Session.Cfg.Save(); }
 
-                var missing = Evidence.Missing(folder, Session.Depois);
+                answersFromFile = true;
+                dirty = false; saveTimer.Stop();   // o exporte já gravou tudo
+                // O JSON é gravado em qualquer modo; as pendências são só um lembrete, contadas no modo escolhido.
+                var missing = Evidence.Missing(folder, Session.Depois, mode.Value);
                 string msg = "Salvo em Documentos:\n" + string.Join("\n", laudo) + "\n(importe no laudo web pelo botão Importar)";
-                if (missing.Count > 0) Toast.Show(msg + "\nAinda faltam " + missing.Count + " evidências obrigatórias (veja o Checklist).", true);
-                else Toast.Show(msg);
+                if (missing.Count > 0) msg += "\nLembrete: no modo " + mode.Value + " faltam " + missing.Count + " evidência(s) (veja o Checklist).";
+                Toast.Show(msg);
             }
             catch (Exception ex) { Log.Write("Erro ao exportar: " + ex); Toast.Show("Erro ao exportar: " + ex.Message, true); }
         }
 
         protected override void Dispose(bool disposing)
         {
-            if (disposing) { statusTimer.Dispose(); loadTimer.Dispose(); }
+            if (disposing) { statusTimer.Dispose(); loadTimer.Dispose(); saveTimer.Dispose(); }
             base.Dispose(disposing);
         }
     }

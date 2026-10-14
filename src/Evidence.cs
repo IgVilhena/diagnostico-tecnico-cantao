@@ -81,6 +81,15 @@ namespace Diagnostico
             return All().Where(e => Required(e, depois) && !Has(folder, e.Codigo, depois)).ToList();
         }
 
+        // Pendências só do modo de análise escolhido (Rápido, Periféricos...): os prints das etapas desse modo
+        // e, nos modos Completo e Todos, também as fotos físicas.
+        public static List<EvidenceItem> Missing(string folder, bool depois, string mode)
+        {
+            var tools = new HashSet<ToolConfig>(Session.ToolsForMode(mode));
+            bool photos = mode != "Rápido" && mode != "Estresse" && mode != "Periféricos";
+            return Missing(folder, depois).Where(e => e.IsPhoto ? photos : tools.Contains(e.Tool)).ToList();
+        }
+
         // Nome amigável para títulos (PDF, miniaturas).
         public static string DisplayName(string path)
         {

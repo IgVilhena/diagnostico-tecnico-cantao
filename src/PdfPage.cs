@@ -105,12 +105,12 @@ namespace Diagnostico
         {
             var photos = order.Items.Where(i => i.Checked).Select(i => i.Path).ToList();
             if (folder == null || photos.Count == 0) return;
-            var missing = Evidence.Missing(folder, false);
+            var missing = Evidence.Missing(folder, false, Session.Cfg.ModoAnalise ?? "Completo");
             if (missing.Count > 0)
             {
                 string names = string.Join("\n", missing.Take(12).Select(m => "  -  " + (m.IsPhoto ? "Foto: " : "Print: ") + m.Nome));
                 if (missing.Count > 12) names += "\n  ...";
-                var answer = MessageBox.Show(FindForm(), "Faltam " + missing.Count + " evidências obrigatórias da diretriz:\n\n" + names +
+                var answer = MessageBox.Show(FindForm(), "Faltam " + missing.Count + " evidências do modo " + (Session.Cfg.ModoAnalise ?? "Completo") + ":\n\n" + names +
                     "\n\nGerar o PDF mesmo assim?", "Evidências pendentes", MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
                 if (answer != DialogResult.Yes) return;
             }

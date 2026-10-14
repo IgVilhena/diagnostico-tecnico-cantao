@@ -188,7 +188,7 @@ namespace Diagnostico
             }
         }
 
-        string Name(Key k) { return compact && k.CompactLabel != null ? k.CompactLabel : k.Label; }
+        string KeyLabel(Key k) { return compact && k.CompactLabel != null ? k.CompactLabel : k.Label; }
 
         // Tira da contagem as teclas que o layout escolhido não tem (uma tecla pressionada volta sozinha).
         void ApplyLayout()
@@ -221,7 +221,7 @@ namespace Diagnostico
                 key.Down = down;
                 key.Pressed = true; // conta também quando só chega a soltura (PrtSc)
                 if (key.Excluded && !key.Numpad) key.Excluded = false;
-                lastKey = Name(key);
+                lastKey = KeyLabel(key);
             }
             else if (down)
                 lastKey = "VK " + vk.ToString("X2") + " / SC " + scan.ToString("X2") +
@@ -340,7 +340,7 @@ namespace Diagnostico
                     else { fill = Theme.Panel; text = Theme.Text; border = Theme.Hex("#565d6b"); }
                     Theme.FillRound(g, fill, r, u * 0.12f);
                     Theme.DrawRound(g, border, r, u * 0.12f, 1.4f);
-                    string label = Name(k);
+                    string label = KeyLabel(k);
                     TextRenderer.DrawText(g, label, label.Length > 2 ? small : normal, Rectangle.Round(r), text,
                         TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding | TextFormatFlags.NoPrefix);
                     if (k.Excluded)
@@ -349,7 +349,7 @@ namespace Diagnostico
             }
 
             // o que falta
-            var missing = keys.Where(k => !k.Excluded && !k.Pressed).Select(k => Name(k)).ToList();
+            var missing = keys.Where(k => !k.Excluded && !k.Pressed).Select(k => KeyLabel(k)).ToList();
             int my = (int)(Theme.S(170) + TotalH * u + Theme.S(14));
             string txt = missing.Count == 0 ? "Nenhuma tecla pendente." : "Faltam (" + missing.Count + "): " + string.Join("  ", missing.Take(60));
             TextRenderer.DrawText(g, txt, Theme.Body, new Rectangle(px, my, ClientSize.Width - px * 2, Theme.S(56)),
