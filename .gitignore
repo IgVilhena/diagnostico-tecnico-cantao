@@ -1,0 +1,15 @@
+# Configuracao local (caminhos da maquina/pendrive); o programa cria uma padrao na 1a execucao
+config.json
+
+# Gerados pelo programa
+erro.log
+snap_*.png
+snap_*.txt
+
+# Dados de atendimento e programas de terceiros
+OS/
+Ferramentas/
+
+# Saida dos testes automaticos e copias antigas do executavel
+artifacts/
+backup/

@@ -1,0 +1,85 @@
+DIAGNÓSTICO TÉCNICO — uso no pendrive
+=====================================
+Segue a "Diretriz de Análise e Triagem Técnica".
+
+Estrutura no pendrive (tudo relativo ao .exe, a letra do pendrive não importa):
+
+  DiagnosticoTecnico.exe
+  config.json                 (criado na 1ª execução; guarda pastas, etapas, fotos e testes)
+  erro.log                    (registro de erros e de abertura/fechamento)
+  Ferramentas\
+     HWiNFO\HWiNFO64.exe
+     CrystalDiskInfo\DiskInfo64.exe
+     HDDScan\HDDScan.exe
+     H2testw\h2testw.exe
+     BatteryInfoView\BatteryInfoView.exe
+     FurMark\FurMark.exe
+     Superposition\Superposition.exe
+     Cinebench\Cinebench.exe
+     (use "Configurações > Procurar todos" para achar os .exe)
+  OS\
+     12312\
+        OS_12312_01_TampaSuperior.jpg            fotos físicas (01 a 07)
+        OS_12312_PRINT_01_HWiNFO_Hardware.png    prints (PRINT_01 a PRINT_09)
+        OS_12312_PRINT_03_CrystalDiskInfo_Depois.png   repetição pós-manutenção
+        Documentos\OS_12312.json                       dados completos do app
+        Documentos\12312 - RELATORIO - <cliente>.json   para importar no laudo web
+        Documentos\Relatorio_OS_12312.pdf
+        Textos\DiskInfo.txt
+
+Fluxo:
+  1. Fazer análise: digite o número da OS e escolha a fase (Antes / Depois da manutenção).
+  2. Clique em cada etapa da lista: o programa (ou site de teste) abre e ela vira a "etapa atual".
+     Aperte F9 (maximiza a janela e tira o print) ou F8 (print da tela como está).
+     O print é SEMPRE da tela inteira, com barra de tarefas, data e hora (Regra de Ouro),
+     e já sai com o nome padronizado da etapa. Print refeito ganha _2, _3 (nada é apagado).
+  3. Fotos físicas (celular/câmera): "Checklist" > clique na foto, ou "Editar análise" > "+ Nova Foto".
+     O arquivo é copiado para a OS já com o nome certo.
+  4. Marque Sim / Não / Não Tem nos testes funcionais e clique "Exportar JSON".
+  5. Depois da manutenção: mude a fase para "Depois", repita os testes e prints.
+     Em "Antes x Depois" preencha a tabela de comparação e as observações do laudo.
+  6. Gerar PDF relatório: laudo (equipamento, saúde, testes, comparação, checklist de
+     evidências, observações) + uma página por foto/print. Avisa se faltar evidência obrigatória.
+
+Laudo web (repositório cantao-informatica-documento, index.html):
+  "Exportar JSON" grava em OS\<numero>\Documentos\ os arquivos que o botão "Importar" do laudo lê:
+     <OS> - RELATORIO - <cliente>.json      coluna TÉCNICO + parecer   (testes da fase Antes)
+     <OS> - TESTES_FINAL - <cliente>.json   coluna TESTES + checklist  (testes da fase Depois)
+  Sim = Funcionando, Não = Com defeito, Não Tem = Não Se Aplica, sem marcar = Não Testado.
+  O texto de "Antes x Depois > Observações" entra no fim do parecer técnico.
+
+Observações:
+  - FurMark: se o print for tirado antes de 10 minutos rodando, o programa avisa.
+  - H2testw é condicional: não conta como pendência.
+  - Para desligar o print em tela inteira: "PrintTelaInteira": false no config.json.
+  - Etapas, nomes dos arquivos, fotos, testes e itens da comparação são editáveis
+    (Configurações ou config.json).
+
+Requisitos: Windows 10/11 ou WinPE com .NET Framework 4.x (ex.: Sergei Strelec).
+O programa pede administrador (necessário para CrystalDiskInfo/HWiNFO).
+Só fecha pelo botão X da janela.
+
+Para recompilar: execute build.bat (usa o compilador que já vem no Windows).
+
+IDENTIDADE CANTAO E APARENCIA
+============================
+- As duas logos originais ficam em assets e sao incorporadas ao executavel.
+  Depois de compilar, o .exe continua funcionando no pendrive sem arquivos de imagem externos.
+- Use "Modo escuro" / "Modo claro" no topo para alternar rapidamente.
+- Em "Aparencia" no menu lateral, ou "Personalizar" na tela inicial:
+  escolha Claro, Escuro ou Sistema; destaque Turquesa ou Petroleo;
+  menu Completo ou Compacto; mostrar/ocultar dicas; restaurar a aparencia padrao.
+- O modo Sistema acompanha a preferencia de aplicativos do Windows.
+- As preferencias ficam no config.json junto das configuracoes existentes:
+  Tema, CorDestaque, MenuCompacto e MostrarDicas.
+- O menu se recolhe automaticamente em janelas menores. Os campos de
+  configuracao podem ser acessados pela rolagem, quando necessario.
+- A tela inicial permite buscar por numero ou cliente nas 12 OS mais recentes.
+- Botoes, seletores e caixas de selecao aceitam Tab e Enter/Espaco.
+  Nos testes Sim/Nao/Nao Tem, use as setas para mudar a resposta.
+- Trocar a aparencia preserva os dados preenchidos nas telas abertas.
+
+Verificacao da interface (dados ficticios, isolados em artifacts):
+  powershell -NoProfile -ExecutionPolicy Bypass -File tests\run.ps1
+Gera capturas das telas nos dois temas e verifica busca, persistencia e edicoes.
+A copia da versao anterior fica em backup\antes-identidade-cantao.zip.
