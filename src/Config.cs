@@ -113,7 +113,7 @@ namespace Diagnostico
             LayoutTeclado = "ABNT2";
             Tecnico = "";
             Tema = "Claro";
-            CorDestaque = "Turquesa";
+            CorDestaque = "Verde";
             MostrarDicas = true;
             PrintTelaInteira = true;
             Testes = DefaultTests();

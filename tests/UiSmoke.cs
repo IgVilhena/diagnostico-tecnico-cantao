@@ -40,7 +40,7 @@ public class UiSmoke
     {
         try
         {
-            string isolatedRoot = Environment.GetEnvironmentVariable("CANTAO_UI_TEST_DIR");
+            string isolatedRoot = Environment.GetEnvironmentVariable("DIAG_UI_TEST_DIR");
             if (!string.IsNullOrEmpty(isolatedRoot))
                 typeof(AppPaths).GetField("AppDir").SetValue(null, isolatedRoot);
             Application.EnableVisualStyles();
@@ -98,7 +98,7 @@ public class UiSmoke
                     appearance.Opacity = 0; appearance.ShowInTaskbar = false;
                     appearance.StartPosition = FormStartPosition.Manual; appearance.Location = new Point(-20000, -20000);
                     appearance.Show(form); Application.DoEvents(); Snapshot(appearance, "aparencia-escuro");
-                    Session.Cfg.Tema = "Claro"; Session.Cfg.CorDestaque = "Petróleo"; Session.Cfg.MenuCompacto = true;
+                    Session.Cfg.Tema = "Claro"; Session.Cfg.CorDestaque = "Esmeralda"; Session.Cfg.MenuCompacto = true;
                     form.ApplyAppearance();
                     Check(appearance.BackColor == Theme.Bg, "Open dialog receives light theme");
                     Check(client.Box.BackColor == Theme.Input && client.Box.ForeColor == Theme.Text, "Round trip to light preserves roles");
@@ -107,16 +107,16 @@ public class UiSmoke
                 Session.Cfg.MostrarDicas = false;
                 Check(Session.Cfg.TrySave(), "Save settings");
                 var restored = AppConfig.Load();
-                Check(restored.Tema == "Claro" && restored.CorDestaque == "Petróleo" && restored.MenuCompacto && !restored.MostrarDicas, "Persist appearance settings");
+                Check(restored.Tema == "Claro" && restored.CorDestaque == "Esmeralda" && restored.MenuCompacto && !restored.MostrarDicas, "Persist appearance settings");
                 Check(restored.Tecnico == "Técnico de teste" && restored.Programas.Count == Session.Cfg.Programas.Count, "Preserve existing configuration");
                 foreach (string themeName in new[] { "Claro", "Escuro" })
-                    foreach (string accentName in new[] { "Turquesa", "Petróleo" })
+                    foreach (string accentName in new[] { "Verde", "Esmeralda" })
                     {
                         Session.Cfg.Tema = themeName; Session.Cfg.CorDestaque = accentName; form.ApplyAppearance();
                         Check(Contrast(Theme.Text, Theme.Panel) >= 4.5 && Contrast(Theme.TextDim, Theme.Bg) >= 4.5 && Contrast(Theme.AccentText, Theme.Accent) >= 4.5, "Readable palette " + themeName + "/" + accentName);
                         Check(Field<Control>(home, "hero").BackColor == Theme.Brand, "Brand color survives accent changes");
                     }
-                Session.Cfg.Tema = "Claro"; Session.Cfg.CorDestaque = "Turquesa"; form.ApplyAppearance();
+                Session.Cfg.Tema = "Claro"; Session.Cfg.CorDestaque = "Verde"; form.ApplyAppearance();
                 form.Size = new Size(1080, 640);
                 for (int i = 0; i < 5; i++) { form.Go(i); Application.DoEvents(); Snapshot(form, "small-" + i); }
                 var detail = Field<RoundPanel>(pages[4], "detail");

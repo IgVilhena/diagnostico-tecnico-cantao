@@ -3,8 +3,8 @@ using System.Drawing;
 using System.Threading;
 using System.Windows.Forms;
 
-[assembly: System.Reflection.AssemblyTitle("Cantão · Diagnóstico Técnico")]
-[assembly: System.Reflection.AssemblyProduct("Cantão · Diagnóstico Técnico")]
+[assembly: System.Reflection.AssemblyTitle("Diagnóstico Técnico")]
+[assembly: System.Reflection.AssemblyProduct("Diagnóstico Técnico")]
 [assembly: System.Reflection.AssemblyVersion("1.0.0.0")]
 
 namespace Diagnostico

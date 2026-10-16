@@ -23,7 +23,7 @@ public static class KeyboardRegression
     public static int Run()
     {
         checks = 0;
-        string output = Path.Combine(Environment.GetEnvironmentVariable("CANTAO_UI_TEST_DIR") ?? Path.Combine(Environment.CurrentDirectory, "artifacts"), "keyboard-results.txt");
+        string output = Path.Combine(Environment.GetEnvironmentVariable("DIAG_UI_TEST_DIR") ?? Path.Combine(Environment.CurrentDirectory, "artifacts"), "keyboard-results.txt");
         var originalWindow = Session.MainWindow;
         try
         {

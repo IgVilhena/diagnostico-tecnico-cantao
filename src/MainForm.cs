@@ -27,7 +27,7 @@ namespace Diagnostico
 
         public MainForm()
         {
-            Text = "Cantão · Diagnóstico Técnico" + (SystemInfo.IsWinPE ? " · WinPE" : "");
+            Text = "Diagnóstico Técnico" + (SystemInfo.IsWinPE ? " · WinPE" : "");
             FormBorderStyle = FormBorderStyle.None;
             BackColor = Theme.Bg;
             ForeColor = Theme.Text;
@@ -321,7 +321,7 @@ namespace Diagnostico
             Icons.Back = Theme.Panel;
             var flags = TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding | TextFormatFlags.EndEllipsis;
             int x = Theme.S(50);
-            string app = "Cantão · Diagnóstico";
+            string app = "Diagnóstico Técnico";
             int aw = TextRenderer.MeasureText(g, app, Theme.BodyBold, Size.Empty, TextFormatFlags.NoPadding).Width;
             TextRenderer.DrawText(g, app, Theme.BodyBold, new Rectangle(x, 0, aw + 4, Height), Theme.Text, flags);
             x += aw + Theme.S(10);
@@ -430,13 +430,11 @@ namespace Diagnostico
             using (var pen = new Pen(Theme.Line)) g.DrawLine(pen, Width - 1, 0, Width - 1, Height);
             if (Compact)
             {
-                Theme.FillRound(g, Theme.Brand, new Rectangle(Theme.S(24), Theme.S(18), Theme.S(48), Theme.S(48)), Theme.S(14));
-                TextRenderer.DrawText(g, "C", Theme.Big, new Rectangle(Theme.S(24), Theme.S(18), Theme.S(48), Theme.S(48)), Color.White,
-                    TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
+                AppLogo.DrawBadge(g, new Rectangle(Theme.S(24), Theme.S(18), Theme.S(48), Theme.S(48)));
             }
             else
             {
-                BrandAssets.Logo(g, new Rectangle(Theme.S(16), Theme.S(18), Width - Theme.S(32), Theme.S(98)));
+                AppLogo.Draw(g, new Rectangle(Theme.S(20), Theme.S(36), Width - Theme.S(36), Theme.S(70)));
                 TextRenderer.DrawText(g, "ÁREA TÉCNICA", Theme.Small, new Rectangle(Theme.S(22), Theme.S(122), Width - Theme.S(44), Theme.S(22)), Theme.TextDim);
             }
         }

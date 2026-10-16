@@ -138,15 +138,10 @@ namespace Diagnostico
             protected override void OnPaint(PaintEventArgs e)
             {
                 var g = e.Graphics;
-                int imageWidth = Math.Min(Width * 36 / 100, Theme.S(350));
-                var state = g.Save();
-                using (var clip = Theme.Round(new Rectangle(0, 0, Width - 1, Height - 1), Theme.S(16))) g.SetClip(clip);
-                BrandAssets.Banner(g, new Rectangle(Width - imageWidth, 0, imageWidth, Height));
-                g.Restore(state);
-                int textWidth = Width - imageWidth - Theme.S(44);
-                TextRenderer.DrawText(g, "DIAGNÓSTICO TÉCNICO", Theme.Small, new Rectangle(Theme.S(24), Theme.S(20), textWidth, Theme.S(24)), Theme.Hex("#B8E7E4"), TextFormatFlags.Left);
+                int textWidth = Width - Theme.S(48);
+                TextRenderer.DrawText(g, "DIAGNÓSTICO TÉCNICO", Theme.Small, new Rectangle(Theme.S(24), Theme.S(20), textWidth, Theme.S(24)), Theme.Hex("#86E0A8"), TextFormatFlags.Left);
                 TextRenderer.DrawText(g, "Tudo pronto para a próxima OS.", Theme.Heading, new Rectangle(Theme.S(24), Theme.S(48), textWidth, Theme.S(32)), Color.White, TextFormatFlags.EndEllipsis);
-                TextRenderer.DrawText(g, "Analise, registre as evidências e gere o laudo.", Theme.Small, new Rectangle(Theme.S(24), Theme.S(83), textWidth, Theme.S(24)), Theme.Hex("#D7EEEB"), TextFormatFlags.EndEllipsis);
+                TextRenderer.DrawText(g, "Analise, registre as evidências e gere o laudo.", Theme.Small, new Rectangle(Theme.S(24), Theme.S(83), textWidth, Theme.S(24)), Theme.Hex("#D1D5DB"), TextFormatFlags.EndEllipsis);
                 if (Session.Cfg.MostrarDicas && textWidth > Theme.S(590))
                     TextRenderer.DrawText(g, "F9 · capturar print", Theme.Small, new Rectangle(Theme.S(228), Theme.S(124), textWidth - Theme.S(228), Theme.S(24)), Color.White, TextFormatFlags.Left);
             }

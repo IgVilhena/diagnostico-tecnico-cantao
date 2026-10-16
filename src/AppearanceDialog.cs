@@ -8,7 +8,7 @@ namespace Diagnostico
     {
         readonly MainForm main;
         readonly DarkSelect theme = new DarkSelect("Claro", "Escuro", "Sistema");
-        readonly DarkSelect accent = new DarkSelect("Turquesa", "Petróleo");
+        readonly DarkSelect accent = new DarkSelect("Verde", "Esmeralda");
         readonly DarkSelect navigation = new DarkSelect("Completo", "Compacto");
         readonly DarkCheck hints = new DarkCheck("Mostrar dicas e atalhos");
         readonly Label status = UI.Label("As alterações são aplicadas na hora.", Theme.Small, Theme.TextDim, Theme.Bg);
@@ -17,7 +17,7 @@ namespace Diagnostico
         public AppearanceDialog(MainForm main)
         {
             this.main = main;
-            Text = "Aparência · Cantão";
+            Text = "Aparência";
             BackColor = Theme.Bg; ForeColor = Theme.Text; Font = Theme.Body;
             FormBorderStyle = FormBorderStyle.FixedDialog;
             MaximizeBox = false; MinimizeBox = false; ShowInTaskbar = false;
@@ -25,7 +25,7 @@ namespace Diagnostico
             AutoScaleMode = AutoScaleMode.None;
             ClientSize = new Size(Theme.S(620), Theme.S(620));
             var title = UI.Label("Do seu jeito", Theme.Big, Theme.Text, Theme.Bg);
-            var subtitle = UI.Label("A identidade da Cantão, no seu espaço de trabalho.", Theme.Body, Theme.TextDim, Theme.Bg);
+            var subtitle = UI.Label("Escolha o tema, a cor de destaque e o menu.", Theme.Body, Theme.TextDim, Theme.Bg);
             Place(title, 28, 20, 560, 36); Place(subtitle, 28, 60, 560, 28);
             Place(preview, 28, 108, 564, 138);
             AddLabel("Tema", 28, 268, 268);
@@ -42,7 +42,7 @@ namespace Diagnostico
             done.Click += (s, e) => Close();
             reset.Click += (s, e) =>
             {
-                Session.Cfg.Tema = "Claro"; Session.Cfg.CorDestaque = "Turquesa";
+                Session.Cfg.Tema = "Claro"; Session.Cfg.CorDestaque = "Verde";
                 Session.Cfg.MenuCompacto = false; Session.Cfg.MostrarDicas = true;
                 Sync(); Apply();
             };
@@ -56,7 +56,7 @@ namespace Diagnostico
         void Sync()
         {
             theme.Value = Session.Cfg.Tema == "Escuro" || Session.Cfg.Tema == "Sistema" ? Session.Cfg.Tema : "Claro";
-            accent.Value = Session.Cfg.CorDestaque == "Petróleo" ? "Petróleo" : "Turquesa";
+            accent.Value = Session.Cfg.CorDestaque == "Esmeralda" ? "Esmeralda" : "Verde";
             navigation.Value = Session.Cfg.MenuCompacto ? "Compacto" : "Completo";
             hints.Checked = Session.Cfg.MostrarDicas;
         }
@@ -95,8 +95,8 @@ namespace Diagnostico
                 var g = e.Graphics; g.Clear(ParentColor); Theme.Smooth(g);
                 Theme.FillRound(g, Theme.Panel, new Rectangle(1, 1, Width - 3, Height - 3), Theme.S(14));
                 Theme.DrawRound(g, Theme.Border, new Rectangle(1, 1, Width - 3, Height - 3), Theme.S(14));
-                BrandAssets.Logo(g, new Rectangle(Theme.S(16), Theme.S(24), Theme.S(160), Theme.S(86)));
-                TextRenderer.DrawText(g, "Diagnóstico técnico", Theme.Heading, new Rectangle(Theme.S(198), Theme.S(20), Width - Theme.S(218), Theme.S(30)), Theme.Text);
+                AppLogo.Draw(g, new Rectangle(Theme.S(20), Theme.S(34), Theme.S(170), Theme.S(66)));
+                TextRenderer.DrawText(g, "Sua bancada, organizada.", Theme.Heading, new Rectangle(Theme.S(198), Theme.S(20), Width - Theme.S(218), Theme.S(30)), Theme.Text);
                 TextRenderer.DrawText(g, "Uma prévia da sua aparência", Theme.Small, new Rectangle(Theme.S(198), Theme.S(54), Width - Theme.S(218), Theme.S(26)), Theme.TextDim);
                 var button = new Rectangle(Theme.S(200), Theme.S(90), Theme.S(138), Theme.S(30));
                 Theme.FillRound(g, Theme.Accent, button, Theme.S(7));

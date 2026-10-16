@@ -14,7 +14,8 @@ namespace Diagnostico
 
         public static Color Bg, TitleBar, Panel, PanelHover, Border, Line, Input, Text, TextDim;
         public static Color Accent, AccentText, Selected, CheckBlue, DotRed, DotYellow, DotGreen;
-        public static readonly Color Brand = Hex("#075B5E"), Turquoise = Hex("#2DA8AD");
+        // Fundo fixo do banner da tela inicial (não muda com o tema)
+        public static readonly Color Brand = Hex("#1F2937");
         public static bool IsDark { get; private set; }
         // Mantém as referências: linhas já abertas também recebem as novas cores.
         public static readonly Color[] PillGreen = new Color[2], PillYellow = new Color[2],
@@ -24,31 +25,33 @@ namespace Diagnostico
 
         static void Pair(Color[] pair, string bg, string fg) { pair[0] = Hex(bg); pair[1] = Hex(fg); }
 
-        static void SetPalette(bool dark, bool petroleum)
+        // Paleta grafite + verde. Cada cor é única dentro do modo (Apply troca as cores pelo valor),
+        // por isso o texto sobre o destaque no claro é #FEFFFF e não #FFFFFF, que é o painel.
+        static void SetPalette(bool dark, bool emerald)
         {
             IsDark = dark;
-            Bg = Hex(dark ? "#101E23" : "#F2F7F6");
-            TitleBar = Hex(dark ? "#13272B" : "#EAF3F1");
-            Panel = Hex(dark ? "#1A2E34" : "#FFFFFF");
-            PanelHover = Hex(dark ? "#243F46" : "#E8F4F2");
-            Border = Hex(dark ? "#355159" : "#CADDD9");
-            Line = Hex(dark ? "#2D464E" : "#E1EBE8");
-            Input = Hex(dark ? "#14262C" : "#F8FBFA");
-            Text = Hex(dark ? "#ECF5F4" : "#173C40");
-            TextDim = Hex(dark ? "#ADC4C7" : "#526E72");
-            Accent = Hex(dark ? (petroleum ? "#85CAC5" : "#46C3C6") : (petroleum ? "#075B5E" : "#087D83"));
-            AccentText = Hex(dark ? "#063C40" : "#FEFFFF");
-            Selected = Hex(dark ? "#244C52" : "#DCEFEA");
-            CheckBlue = Hex(dark ? "#248B91" : "#14777D");
-            DotRed = Hex(dark ? "#F49494" : "#B73340");
-            DotYellow = Hex(dark ? "#EDC66F" : "#926013");
-            DotGreen = Hex(dark ? "#72D3A7" : "#18744D");
-            Pair(PillGreen, dark ? "#1E4238" : "#DEF3E8", dark ? "#8AE0B6" : "#19603E");
-            Pair(PillYellow, dark ? "#453C26" : "#FFF0CF", dark ? "#F2CF83" : "#80540C");
-            Pair(PillBlue, dark ? "#223C51" : "#E4EEF9", dark ? "#A5CEFA" : "#315D8C");
-            Pair(PillGray, dark ? "#2B4148" : "#EAF0EE", dark ? "#C0D3D5" : "#526765");
-            Pair(PillRed, dark ? "#482E35" : "#FBE6E7", dark ? "#FFB0B5" : "#A32F3B");
-            Pair(PillPurple, dark ? "#3A294F" : "#F0E8FA", dark ? "#D5B4F5" : "#7141A3");
+            Bg = Hex(dark ? "#121417" : "#F4F5F7");
+            TitleBar = Hex(dark ? "#16191D" : "#ECEEF1");
+            Panel = Hex(dark ? "#1C1F24" : "#FFFFFF");
+            PanelHover = Hex(dark ? "#262A30" : "#EEF1F3");
+            Border = Hex(dark ? "#33383F" : "#D9DCE1");
+            Line = Hex(dark ? "#2A2E34" : "#E6E8EB");
+            Input = Hex(dark ? "#17191D" : "#F9FAFB");
+            Text = Hex(dark ? "#E9ECEF" : "#1F2328");
+            TextDim = Hex(dark ? "#A3ABB5" : "#5B636E");
+            Accent = Hex(dark ? (emerald ? "#34D399" : "#4ADE80") : (emerald ? "#047857" : "#15803D"));
+            AccentText = Hex(dark ? "#0B2A16" : "#FEFFFF");
+            Selected = Hex(dark ? "#1F3A2A" : "#E3F1E8");
+            CheckBlue = Hex(dark ? "#22A355" : "#1F7A45");
+            DotRed = Hex(dark ? "#F59A9A" : "#B42318");
+            DotYellow = Hex(dark ? "#E8C36A" : "#8A5A00");
+            DotGreen = Hex(dark ? "#6EDC9A" : "#166F3A");
+            Pair(PillGreen, dark ? "#1D3B2A" : "#DCF2E3", dark ? "#86E0A8" : "#166534");
+            Pair(PillYellow, dark ? "#3F3622" : "#FFF1CC", dark ? "#EDCB7E" : "#7A5200");
+            Pair(PillBlue, dark ? "#1F3147" : "#E3EDFB", dark ? "#A3C6F2" : "#2B5A91");
+            Pair(PillGray, dark ? "#2B2F35" : "#ECEEF0", dark ? "#C3C9D0" : "#525A64");
+            Pair(PillRed, dark ? "#43262A" : "#FBE4E4", dark ? "#FFADB3" : "#A3262D");
+            Pair(PillPurple, dark ? "#33264A" : "#EFE7FA", dark ? "#D2B5F3" : "#6B3FA0");
         }
 
         static Color[] Palette()
@@ -70,7 +73,7 @@ namespace Diagnostico
                     dark = Convert.ToInt32(value) == 0;
                 }
                 catch { dark = false; }
-            SetPalette(dark, cfg.CorDestaque == "Petróleo");
+            SetPalette(dark, cfg.CorDestaque == "Esmeralda");
             var after = Palette();
             var map = new Dictionary<int, Color>();
             for (int i = 0; i < before.Length; i++) map[before[i].ToArgb()] = after[i];

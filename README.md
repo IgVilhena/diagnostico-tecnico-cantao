@@ -1,4 +1,4 @@
-# Diagnóstico Técnico · Cantão
+# Diagnóstico Técnico
 
 Programa de bancada para análise e triagem de notebooks e computadores. Guia o técnico pelas etapas do diagnóstico, tira os prints já com o nome padronizado, registra os testes funcionais e gera o laudo em PDF.
 
@@ -15,7 +15,7 @@ Roda direto de um pendrive, sem instalação, em Windows 10/11. Inclui adaptaç�
 - **Antes e depois.** Cada OS tem a fase *Antes* e *Depois* da manutenção, com tabela de comparação e observações.
 - **Checklist de evidências.** Mostra quais fotos e prints obrigatórios ainda faltam.
 - **Relatório em PDF.** Laudo com equipamento, testes, comparação, checklist e uma página por foto ou print.
-- **Exportação em JSON** para importar no laudo web da Cantão.
+- **Exportação em JSON** para importar no laudo web.
 
 ## Como usar
 

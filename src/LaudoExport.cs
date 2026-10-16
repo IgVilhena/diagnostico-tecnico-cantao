@@ -8,7 +8,7 @@ using System.Text.RegularExpressions;
 
 namespace Diagnostico
 {
-    // Gera os JSON que o laudo web da Cantão Informática importa (botão "Importar" do index.html).
+    // Gera os JSON que o laudo web importa (botão "Importar" do index.html).
     //   <OS> - RELATORIO - <cliente>.json      preenche a coluna TÉCNICO + parecer   (fase Antes)
     //   <OS> - TESTES_FINAL - <cliente>.json   preenche a coluna TESTES + checklist  (fase Depois)
     // As chaves (campo_NN / check_NN) são os data-id dos campos da página.
