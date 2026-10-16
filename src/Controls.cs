@@ -484,10 +484,11 @@ namespace Diagnostico
 
     public class ListRow
     {
-        public string Text, Sub, Right, Badge;
+        public string Text, Sub, Right, Badge, KindBadge;
         public string Lead;          // número mostrado num círculo à esquerda (etapas)
         public bool LeadDone;        // círculo verde com ✓
-        public Color[] BadgeColors;
+        public bool Dimmed;          // etapa desativada
+        public Color[] BadgeColors, KindColors;
         public object Tag;
     }
 
@@ -498,10 +499,14 @@ namespace Diagnostico
         public int RowHeight = 54;
         public int SelectedIndex = -1;
         public bool Selectable = true;
+        public bool Reorderable;
         public event EventHandler<int> RowClick, RowDoubleClick;
         public event EventHandler<int> RowRightClick;
+        public event Action<int, int> RowMoved;
         readonly ScrollHelper scroll;
         int hover = -1;
+        int dragIndex = -1, dropIndex = -1, mouseDownY;
+        bool dragStarted;
 
         public RowList()
         {
@@ -538,6 +543,11 @@ namespace Diagnostico
             if (e.Button == MouseButtons.Left)
             {
                 if (Selectable) SelectedIndex = i;
+                if (Reorderable)
+                {
+                    dragIndex = i; dropIndex = i; mouseDownY = e.Y; dragStarted = false;
+                    Capture = true;
+                }
                 Invalidate();
                 if (RowClick != null) RowClick(this, i);
             }
@@ -557,12 +567,49 @@ namespace Diagnostico
         protected override void OnMouseMove(MouseEventArgs e)
         {
             if (scroll.MouseMove(e, Track)) return;
+            if (Reorderable && dragIndex >= 0)
+            {
+                if (!dragStarted && Math.Abs(e.Y - mouseDownY) < Theme.S(4)) return;
+                dragStarted = true;
+                Cursor = Cursors.SizeNS;
+                int target = (int)Math.Round((e.Y + scroll.Offset) / (float)RH);
+                dropIndex = Math.Max(0, Math.Min(Rows.Count, target));
+                if (e.Y < Theme.S(20)) scroll.Wheel(60);
+                if (e.Y > Height - Theme.S(20)) scroll.Wheel(-60);
+                Invalidate();
+                return;
+            }
             int h = HitRow(e.Location);
+            if (Reorderable) Cursor = h >= 0 && e.X < Theme.S(28) ? Cursors.SizeNS : Cursors.Default;
             if (h != hover) { hover = h; Invalidate(); }
         }
 
-        protected override void OnMouseUp(MouseEventArgs e) { scroll.MouseUp(); }
-        protected override void OnMouseLeave(EventArgs e) { hover = -1; Invalidate(); }
+        protected override void OnMouseUp(MouseEventArgs e)
+        {
+            if (scroll.MouseUp()) return;
+            if (Reorderable && dragIndex >= 0)
+            {
+                Capture = false;
+                Cursor = Cursors.Default;
+                int from = dragIndex;
+                bool moved = dragStarted && dropIndex != dragIndex && dropIndex != dragIndex + 1;
+                int to = dropIndex > dragIndex ? dropIndex - 1 : dropIndex;
+                dragIndex = -1; dropIndex = -1; dragStarted = false;
+                if (moved && to >= 0 && to < Rows.Count)
+                {
+                    var item = Rows[from];
+                    Rows.RemoveAt(from);
+                    Rows.Insert(to, item);
+                    if (Selectable) SelectedIndex = to;
+                    Invalidate();
+                    if (RowMoved != null) RowMoved(from, to);
+                    return;
+                }
+                Invalidate();
+            }
+        }
+
+        protected override void OnMouseLeave(EventArgs e) { hover = -1; if (dragIndex < 0) Cursor = Cursors.Default; Invalidate(); }
 
         protected override void OnPaint(PaintEventArgs e)
         {
@@ -574,6 +621,7 @@ namespace Diagnostico
             scroll.Clamp();
             int pad = Theme.S(12);
             using (var line = new Pen(Theme.Line))
+            using (var dot = new SolidBrush(Color.FromArgb(130, Theme.TextDim)))
             {
                 for (int i = 0; i < Rows.Count; i++)
                 {
@@ -601,10 +649,18 @@ namespace Diagnostico
                             TextFormatFlags.Right | TextFormatFlags.VerticalCenter);
                     }
                     var textRect = new Rectangle(inner.X, y, inner.Width - rightW, RH);
+                    if (Reorderable)
+                    {
+                        int hx = textRect.X, hy = y + RH / 2 - Theme.S(10);
+                        for (int gr = 0; gr < 4; gr++)
+                            for (int gc = 0; gc < 2; gc++)
+                                g.FillEllipse(dot, hx + gc * Theme.S(5), hy + gr * Theme.S(6), Theme.S(3), Theme.S(3));
+                        textRect.X += Theme.S(16); textRect.Width -= Theme.S(16);
+                    }
                     if (row.Lead != null)
                     {
                         int d = Theme.S(28);
-                        var c = new Rectangle(inner.X, y + (RH - d) / 2, d, d);
+                        var c = new Rectangle(textRect.X, y + (RH - d) / 2, d, d);
                         if (row.LeadDone)
                         {
                             using (var b = new SolidBrush(Theme.Hex("#1f7a43"))) g.FillEllipse(b, c);
@@ -619,19 +675,38 @@ namespace Diagnostico
                         }
                         textRect.X += d + Theme.S(12); textRect.Width -= d + Theme.S(12);
                     }
-                    if (string.IsNullOrEmpty(row.Sub))
-                        TextRenderer.DrawText(g, row.Text, Theme.Body, textRect, Theme.Text,
+                    Color titleColor = row.Dimmed ? Theme.TextDim : Theme.Text;
+                    if (string.IsNullOrEmpty(row.Sub) && string.IsNullOrEmpty(row.KindBadge))
+                        TextRenderer.DrawText(g, row.Text, Theme.Body, textRect, titleColor,
                             TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPadding);
                     else
                     {
                         int th = TextRenderer.MeasureText("Ag", Theme.Body).Height;
                         int sh = TextRenderer.MeasureText("Ag", Theme.Small).Height;
-                        int top = y + (RH - th - sh) / 2;
-                        TextRenderer.DrawText(g, row.Text, Theme.Body, new Rectangle(textRect.X, top, textRect.Width, th), Theme.Text,
+                        int top = y + (RH - th - sh - Theme.S(2)) / 2;
+                        TextRenderer.DrawText(g, row.Text, Theme.Body, new Rectangle(textRect.X, top, textRect.Width, th), titleColor,
                             TextFormatFlags.EndEllipsis | TextFormatFlags.NoPadding);
-                        TextRenderer.DrawText(g, row.Sub, Theme.Small, new Rectangle(textRect.X, top + th, textRect.Width, sh), Theme.TextDim,
-                            TextFormatFlags.EndEllipsis | TextFormatFlags.NoPadding);
+                        int subX = textRect.X;
+                        if (!string.IsNullOrEmpty(row.KindBadge))
+                        {
+                            var ksz = TextRenderer.MeasureText(g, row.KindBadge, Theme.Small, Size.Empty, TextFormatFlags.NoPadding);
+                            int kw = ksz.Width + Theme.S(14), kh = sh + Theme.S(2);
+                            var kr = new Rectangle(subX, top + th + Theme.S(1), kw, kh);
+                            var kc = row.KindColors ?? Theme.PillGray;
+                            Theme.FillRound(g, kc[0], kr, kh / 2f);
+                            TextRenderer.DrawText(g, row.KindBadge, Theme.Small, kr, kc[1],
+                                TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
+                            subX += kw + Theme.S(6);
+                        }
+                        if (!string.IsNullOrEmpty(row.Sub) && subX < textRect.Right)
+                            TextRenderer.DrawText(g, row.Sub, Theme.Small, new Rectangle(subX, top + th + Theme.S(2), textRect.Right - subX, sh), Theme.TextDim,
+                                TextFormatFlags.EndEllipsis | TextFormatFlags.NoPadding);
                     }
+                }
+                if (Reorderable && dragStarted && dropIndex >= 0)
+                {
+                    int dy = Math.Max(1, Math.Min(Height - 2, dropIndex * RH - scroll.Offset));
+                    using (var p = new Pen(Theme.Accent, Theme.S(2))) g.DrawLine(p, pad, dy, Width - pad, dy);
                 }
             }
             scroll.Paint(g, Track);

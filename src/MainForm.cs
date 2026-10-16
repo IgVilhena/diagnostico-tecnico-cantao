@@ -141,7 +141,7 @@ namespace Diagnostico
         protected override void OnHandleCreated(EventArgs e)
         {
             base.OnHandleCreated(e);
-            hotkeysOk = Native.RegisterHotKey(Handle, 1, 0, Native.VK_F9) & Native.RegisterHotKey(Handle, 2, 0, Native.VK_F8);
+            hotkeysOk = !Native.IsWindows || (Native.RegisterHotKey(Handle, 1, 0, Native.VK_F9) & Native.RegisterHotKey(Handle, 2, 0, Native.VK_F8));
             titleBar.Hint = hotkeysOk ? "F9 maximiza e tira o print  ·  F8 print da tela"
                                       : "Atalhos F8/F9 indisponíveis (usados por outro programa)";
             try { int round = 2; Native.DwmSetWindowAttribute(Handle, 33, ref round, 4); } catch { }
@@ -277,8 +277,17 @@ namespace Diagnostico
 
         int HitBtn(Point p) { for (int i = 0; i < 3; i++) if (Btn(i).Contains(p)) return i; return -1; }
 
+        bool dragging;
+        Point dragStart, formStart;
+
         protected override void OnMouseMove(MouseEventArgs e)
         {
+            if (dragging)
+            {
+                var p = Cursor.Position;
+                form.Location = new Point(formStart.X + p.X - dragStart.X, formStart.Y + p.Y - dragStart.Y);
+                return;
+            }
             int h = HitBtn(e.Location);
             if (h != hoverBtn) { hoverBtn = h; Invalidate(); }
         }
@@ -292,12 +301,22 @@ namespace Diagnostico
             int b = HitBtn(e.Location);
             if (b >= 0) { if (e.Clicks == 1) { downBtn = b; pressed = true; Invalidate(); } return; }
             if (e.Clicks == 2) { form.ToggleMaximize(); return; }
-            Native.ReleaseCapture();
-            Native.SendMessage(form.Handle, Native.WM_NCLBUTTONDOWN, (IntPtr)Native.HTCAPTION, IntPtr.Zero);
+            if (Native.IsWindows)
+            {
+                Native.ReleaseCapture();
+                Native.SendMessage(form.Handle, Native.WM_NCLBUTTONDOWN, (IntPtr)Native.HTCAPTION, IntPtr.Zero);
+            }
+            else if (form.WindowState == FormWindowState.Normal)
+            {
+                dragging = true;
+                dragStart = Cursor.Position;
+                formStart = form.Location;
+            }
         }
 
         protected override void OnMouseUp(MouseEventArgs e)
         {
+            dragging = false;
             int down = downBtn;
             downBtn = -1;
             pressed = false;

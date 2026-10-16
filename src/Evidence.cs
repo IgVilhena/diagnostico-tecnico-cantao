@@ -99,7 +99,8 @@ namespace Diagnostico
             string code = m.Groups[1].Value;
             string suffix = m.Groups[2].Success ? " (depois)" : "";
             var e = Items(true).FirstOrDefault(x => string.Equals(x.Codigo, code, StringComparison.OrdinalIgnoreCase));
-            string name = e != null ? e.Nome : code.Replace('_', ' ');
+            var p = e != null ? null : AppConfig.PresetTools().FirstOrDefault(x => string.Equals(x.Codigo, code, StringComparison.OrdinalIgnoreCase));
+            string name = e != null ? e.Nome : p != null ? p.Nome : code.Replace('_', ' ');
             return name + suffix;
         }
 

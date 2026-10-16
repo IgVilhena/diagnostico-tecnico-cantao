@@ -88,9 +88,10 @@ namespace Diagnostico
         [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
         static List<Dictionary<string, object>> QueryWmi(string scope, string wql)
         {
+            if (!Native.IsWindows) return new List<Dictionary<string, object>>();
             var list = new List<Dictionary<string, object>>();
-            var options = new EnumerationOptions { Timeout = TimeSpan.FromSeconds(3), ReturnImmediately = false };
-            using (var searcher = new ManagementObjectSearcher(scope, wql, options))
+            var options = new System.Management.EnumerationOptions { Timeout = TimeSpan.FromSeconds(3), ReturnImmediately = false };
+            using (var searcher = new ManagementObjectSearcher(new ManagementScope(scope), new ObjectQuery(wql), options))
             using (var result = searcher.Get())
                 foreach (ManagementObject obj in result)
                     using (obj)

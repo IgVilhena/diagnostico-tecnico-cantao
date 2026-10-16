@@ -61,7 +61,9 @@ namespace Diagnostico
                 {
                     Log.Write("Ambiente WinPE " + (Environment.Is64BitOperatingSystem ? "x64" : "x86") + "; CLR " + Environment.Version);
                     if (!WinPeSupport.PrepareStorage(Session.Cfg)) return;
-                    ToolDiscovery.FindMissing(Session.Cfg, ToolDiscovery.Executables(ToolDiscovery.SearchRoots(Session.Cfg)), Environment.Is64BitOperatingSystem);
+                    var exes = ToolDiscovery.Executables(ToolDiscovery.SearchRoots(Session.Cfg));
+                    ToolDiscovery.DiscoverPresets(Session.Cfg, exes, Environment.Is64BitOperatingSystem);
+                    ToolDiscovery.FindMissing(Session.Cfg, exes, Environment.Is64BitOperatingSystem);
                     Session.Cfg.Save();
                 }
                 Theme.Configure(Session.Cfg);

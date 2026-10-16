@@ -57,6 +57,7 @@ namespace Diagnostico
         // Offline esconde as etapas que são sites; Online esconde o teste interno que tem site equivalente.
         public static bool Allowed(ToolConfig t)
         {
+            if (t == null || t.Desativado) return false;
             switch (Cfg.TipoTestes)
             {
                 case "Offline": return !t.IsUrl;
@@ -65,10 +66,11 @@ namespace Diagnostico
             }
         }
 
-        // No modo Online o site deixa de ser só uma alternativa ao teste interno e passa a ser a etapa exigida.
+        // No modo Online (ou se o teste interno equivalente estiver desativado) o site deixa de ser só uma alternativa e passa a ser exigido.
         public static bool IsConditional(ToolConfig t)
         {
-            if (Cfg.TipoTestes == "Online" && t.IsUrl) return false;
+            if (t.IsUrl && (Cfg.TipoTestes == "Online" || (t.Arquivo == "PRINT_02_Teclado_Online" && !Cfg.Programas.Any(p => p.IsInternal && p.HasOnlineVersion && !p.Desativado))))
+                return false;
             return t.Condicional;
         }
 

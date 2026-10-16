@@ -26,6 +26,7 @@ namespace Diagnostico
         public bool SoEstresse { get; set; }
         public bool SoPerifericos { get; set; }
         public bool Condicional { get; set; }      // só quando necessário (não conta como pendência)
+        public bool Desativado { get; set; }       // etapa desativada em Configurações (testes internos só podem ser desativados)
         public string Descricao { get; set; }
 
         public ToolConfig()
@@ -84,7 +85,7 @@ namespace Diagnostico
 
     public class AppConfig
     {
-        public const int VersaoAtual = 4;
+        public const int VersaoAtual = 5;
 
         public int Versao { get; set; }
         public string PastaOS { get; set; }
@@ -149,37 +150,57 @@ namespace Diagnostico
             };
         }
 
+        // Apenas etapas prontas para uso (testes internos e online), sem poluir a lista com programas externos não instalados.
         public static List<ToolConfig> DefaultTools()
         {
-            var hw = @".\Ferramentas\HWiNFO\HWiNFO64.exe";
             var list = new List<ToolConfig>
             {
-                ToolConfig.Make("HWiNFO - Hardware", hw, "PRINT_01_HWiNFO_Hardware", "CPU, RAM, armazenamento, GPU, placa-mãe e BIOS"),
-                ToolConfig.Make("Teclado (online)", "https://www.testarteclado.com.br", "PRINT_02_Teclado_Online", "Testar 100% das teclas"),
-                ToolConfig.Make("Webcam e Microfone (online)", "https://pt.webcamtests.com", "PRINT_02B_Webcam_Mic_Online", "Imagem da webcam e captação do microfone"),
-                ToolConfig.Make("HDMI / Monitor externo", @"%WINDIR%\System32\DisplaySwitch.exe", "PRINT_02C_HDMI_Tela_Estendida", "Win+P > Estender estas telas e comprovar o sinal"),
-                ToolConfig.Make("CrystalDiskInfo", @".\Ferramentas\CrystalDiskInfo\DiskInfo64.exe", "PRINT_03_CrystalDiskInfo", "S.M.A.R.T., desgaste, horas de uso, erros e temperatura"),
-                ToolConfig.Make("HDDScan", @".\Ferramentas\HDDScan\HDDScan.exe", "PRINT_04_HDDScan_Superficie", "Mapa de blocos, tempos de resposta e setores lentos"),
-                ToolConfig.Make("H2testw", @".\Ferramentas\H2testw\h2testw.exe", "PRINT_04B_H2testw_Escrita", "Condicional: integridade, capacidade e velocidade de escrita"),
-                ToolConfig.Make("BatteryInfoView", @".\Ferramentas\BatteryInfoView\BatteryInfoView.exe", "PRINT_05_BatteryInfoView", "Capacidade, Wear Level, ciclos, descarga e voltagem"),
-                ToolConfig.Make("HWiNFO - Sensores", hw, "PRINT_06_HWiNFO_Sensores", "Temperaturas máximas, hotspot, throttling e power limit"),
-                ToolConfig.Make("FurMark", @".\Ferramentas\FurMark\FurMark.exe", "PRINT_07_FurMark_Estresse", "Mínimo 10 minutos: temperatura, estabilidade e limitações"),
-                ToolConfig.Make("Unigine Superposition", @".\Ferramentas\Superposition\Superposition.exe", "PRINT_08_Superposition_Benchmark", "Pontuação, FPS médio/mín./máx. e temperatura máxima"),
-                ToolConfig.Make("Cinebench", @".\Ferramentas\Cinebench\Cinebench.exe", "PRINT_09_Cinebench_CPU", "Single/Multi-Core, frequência, temperatura e limitações"),
+                new ToolConfig { Nome = "Teclado (offline)", Exe = "interno:teclado", Arquivo = "PRINT_02_Teclado_Offline", Descricao = "Teste interno, sem internet: pressione 100% das teclas", SoPerifericos = true },
+                new ToolConfig { Nome = "Teclado (online)", Exe = "https://www.testarteclado.com.br", Arquivo = "PRINT_02_Teclado_Online", Descricao = "Alternativa online ao teste interno", SoPerifericos = true, Condicional = true },
+                new ToolConfig { Nome = "Webcam e Microfone (online)", Exe = "https://pt.webcamtests.com", Argumentos = "https://pt.mictests.com", Arquivo = "PRINT_02B_Webcam_Mic_Online", Descricao = "Imagem da webcam e captação do microfone", SoPerifericos = true },
+                new ToolConfig { Nome = "Áudio e Microfone (offline)", Exe = "interno:audio", Arquivo = "PRINT_02D_Audio_Mic_Offline", Descricao = "Teste interno: caixas esquerda/direita e gravação do microfone", SoPerifericos = true },
             };
-            foreach (var t in list)
-            {
-                if (t.Arquivo.StartsWith("PRINT_01") || t.Arquivo.StartsWith("PRINT_03") || t.Arquivo.StartsWith("PRINT_05") || t.Arquivo.StartsWith("PRINT_06"))
-                    t.ModoRapido = true;
-                if (t.Arquivo.StartsWith("PRINT_02")) t.SoPerifericos = true;
-                if (t.Arquivo.StartsWith("PRINT_07") || t.Arquivo.StartsWith("PRINT_08") || t.Arquivo.StartsWith("PRINT_09")) t.SoEstresse = true;
-            }
-            list[2].Argumentos = "https://pt.mictests.com";
-            list[3].Argumentos = "/extend";
-            list[6].Condicional = true;
-            list[9].MinutosMinimos = 10;
-            AddInternalTests(list);
             return list;
+        }
+
+        // Pré-configurações prontas para quando o técnico adicionar ou localizar um programa de bancada.
+        // CrystalDiskInfo, BatteryInfoView e Hard Disk Sentinel já vêm no modo automático.
+        public static List<ToolConfig> PresetTools()
+        {
+            var hw = @".\Ferramentas\HWiNFO\HWiNFO64.exe";
+            return new List<ToolConfig>
+            {
+                new ToolConfig { Nome = "CrystalDiskInfo", Exe = @".\Ferramentas\CrystalDiskInfo\DiskInfo64.exe", Arquivo = "PRINT_03_CrystalDiskInfo", Descricao = "S.M.A.R.T., desgaste, horas de uso, erros e temperatura", Modo = "automatico", Espera = 6, ModoRapido = true },
+                new ToolConfig { Nome = "BatteryInfoView", Exe = @".\Ferramentas\BatteryInfoView\BatteryInfoView.exe", Arquivo = "PRINT_05_BatteryInfoView", Descricao = "Capacidade, Wear Level, ciclos, descarga e voltagem", Modo = "automatico", Espera = 5, ModoRapido = true },
+                new ToolConfig { Nome = "Hard Disk Sentinel", Exe = @".\Ferramentas\HDSentinel\HDSentinel.exe", Arquivo = "PRINT_03B_HDSentinel", Descricao = "Saúde, temperatura, horas de uso e alertas S.M.A.R.T. do disco", Modo = "automatico", Espera = 6, ModoRapido = true },
+                new ToolConfig { Nome = "HWiNFO - Hardware", Exe = hw, Arquivo = "PRINT_01_HWiNFO_Hardware", Descricao = "CPU, RAM, armazenamento, GPU, placa-mãe e BIOS", ModoRapido = true },
+                new ToolConfig { Nome = "HWiNFO - Sensores", Exe = hw, Arquivo = "PRINT_06_HWiNFO_Sensores", Descricao = "Temperaturas máximas, hotspot, throttling e power limit", ModoRapido = true },
+                new ToolConfig { Nome = "HDDScan", Exe = @".\Ferramentas\HDDScan\HDDScan.exe", Arquivo = "PRINT_04_HDDScan_Superficie", Descricao = "Mapa de blocos, tempos de resposta e setores lentos" },
+                new ToolConfig { Nome = "H2testw", Exe = @".\Ferramentas\H2testw\h2testw.exe", Arquivo = "PRINT_04B_H2testw_Escrita", Descricao = "Condicional: integridade, capacidade e velocidade de escrita", Condicional = true },
+                new ToolConfig { Nome = "FurMark", Exe = @".\Ferramentas\FurMark\FurMark.exe", Arquivo = "PRINT_07_FurMark_Estresse", Descricao = "Mínimo 10 minutos: temperatura, estabilidade e limitações", SoEstresse = true, MinutosMinimos = 10 },
+                new ToolConfig { Nome = "Unigine Superposition", Exe = @".\Ferramentas\Superposition\Superposition.exe", Arquivo = "PRINT_08_Superposition_Benchmark", Descricao = "Pontuação, FPS médio/mín./máx. e temperatura máxima", SoEstresse = true },
+                new ToolConfig { Nome = "Cinebench", Exe = @".\Ferramentas\Cinebench\Cinebench.exe", Descricao = "Single/Multi-Core, frequência, temperatura e limitações", Arquivo = "PRINT_09_Cinebench_CPU", SoEstresse = true },
+                new ToolConfig { Nome = "HDMI / Monitor externo", Exe = @"%WINDIR%\System32\DisplaySwitch.exe", Argumentos = "/extend", Arquivo = "PRINT_02C_HDMI_Tela_Estendida", Descricao = "Win+P > Estender estas telas e comprovar o sinal", SoPerifericos = true },
+            };
+        }
+
+        public static void CopyPresetTo(ToolConfig preset, ToolConfig target, string exePath = null)
+        {
+            target.Nome = preset.Nome;
+            target.Exe = string.IsNullOrWhiteSpace(exePath) ? preset.Exe : exePath;
+            target.Argumentos = preset.Argumentos;
+            target.Processo = preset.Processo;
+            target.Arquivo = preset.Arquivo;
+            target.Modo = preset.Modo;
+            target.Janela = preset.Janela;
+            target.Espera = preset.Espera;
+            target.MinutosMinimos = preset.MinutosMinimos;
+            target.MaximizarAntesPrint = preset.MaximizarAntesPrint;
+            target.ModoRapido = preset.ModoRapido;
+            target.SoEstresse = preset.SoEstresse;
+            target.SoPerifericos = preset.SoPerifericos;
+            target.Condicional = preset.Condicional;
+            target.Descricao = preset.Descricao;
         }
 
         // Testes offline embutidos (teclado e áudio). O teclado online vira alternativa (condicional).
@@ -203,6 +224,22 @@ namespace Diagnostico
             }
         }
 
+        // Remove etapas externas padrão que nunca foram instaladas e aplica modo automático em CrystalDiskInfo/BatteryInfoView/Sentinel.
+        static void CleanUninstalledPresets(List<ToolConfig> list)
+        {
+            var presetCodes = new HashSet<string>(PresetTools().Select(p => p.Arquivo), StringComparer.OrdinalIgnoreCase);
+            list.RemoveAll(t => !t.IsInternal && !t.IsUrl && presetCodes.Contains(t.Arquivo ?? "") && !t.Exists);
+            foreach (var t in list)
+            {
+                string n = (t.Nome ?? "").ToLowerInvariant();
+                if (n.Contains("crystal") || n.Contains("batteryinfo") || n.Contains("sentinel"))
+                {
+                    t.Modo = "automatico";
+                    if (t.Espera <= 0 || t.Espera == 8) t.Espera = n.Contains("batteryinfo") ? 5 : 6;
+                }
+            }
+        }
+
         // Converte um config.json da versão 1 para o padrão da diretriz, mantendo os caminhos já configurados.
         void Migrate()
         {
@@ -210,11 +247,11 @@ namespace Diagnostico
             var droppedDefaults = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
                 { "CrystalDiskInfo", "BatteryInfoView", "HWiNFO", "CPU-Z", "GPU-Z", "HWMonitor", "HDDScan", "HD Sentinel", "AIDA64", "FurMark", "Keyboard Test" };
             var fresh = DefaultTools();
-            foreach (var t in fresh)
+            foreach (var preset in PresetTools())
             {
-                string file = Path.GetFileName(t.Exe ?? "");
-                var match = old.FirstOrDefault(o => o.Exists && string.Equals(Path.GetFileName(o.Exe ?? ""), file, StringComparison.OrdinalIgnoreCase));
-                if (match != null) t.Exe = match.Exe;
+                string file = Path.GetFileName((preset.Exe ?? "").Replace('\\', '/'));
+                var match = old.FirstOrDefault(o => o.Exists && string.Equals(Path.GetFileName((o.Exe ?? "").Replace('\\', '/')), file, StringComparison.OrdinalIgnoreCase));
+                if (match != null) { preset.Exe = match.Exe; fresh.Add(preset); }
             }
             fresh.AddRange(old.Where(o => !droppedDefaults.Contains(o.Nome ?? "")));
             Programas = fresh;
@@ -247,6 +284,7 @@ namespace Diagnostico
                         bool mudou = cfg.Versao < VersaoAtual;
                         if (cfg.Versao < 3) cfg.Testes = DefaultTests();
                         if (cfg.Versao < 4) AddInternalTests(cfg.Programas);
+                        if (cfg.Versao < 5) { AddInternalTests(cfg.Programas); CleanUninstalledPresets(cfg.Programas); }
                         if (mudou) { cfg.Versao = VersaoAtual; cfg.Save(); }
                         if (cfg.Testes == null || cfg.Testes.Count == 0) cfg.Testes = DefaultTests();
                         if (cfg.Comparacao == null || cfg.Comparacao.Count == 0) cfg.Comparacao = DefaultComparison();
@@ -286,9 +324,10 @@ namespace Diagnostico
         {
             if (string.IsNullOrWhiteSpace(p)) return AppDir;
             p = Environment.ExpandEnvironmentVariables(p.Trim());
+            if (!Native.IsWindows) p = p.Replace('\\', '/');
             // \\servidor\pasta (rede) é caminho completo; só "\pasta" é relativo à pasta do programa
             if (p.StartsWith(@"\\") || (Path.IsPathRooted(p) && !p.StartsWith(@"\"))) return Path.GetFullPath(p);
-            return Path.GetFullPath(Path.Combine(AppDir, p.TrimStart('\\')));
+            return Path.GetFullPath(Path.Combine(AppDir, p.TrimStart('\\', '/')));
         }
 
         public static string ToRelative(string full)
