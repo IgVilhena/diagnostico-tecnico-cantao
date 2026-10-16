@@ -84,11 +84,43 @@ namespace Diagnostico
         static readonly string[][] Families = {
             new[] { "HWiNFO64.exe", "HWiNFO32.exe", "HWiNFO.exe" },
             new[] { "DiskInfo64.exe", "DiskInfo32.exe", "DiskInfo.exe" },
+            new[] { "HDSentinel.exe", "HDSentinel64.exe" },
             new[] { "HDDScan.exe" }, new[] { "h2testw.exe" },
             new[] { "BatteryInfoView.exe", "BatteryInfoView64.exe" },
             new[] { "FurMark.exe", "FurMark_GUI.exe" },
             new[] { "Superposition.exe" }, new[] { "Cinebench.exe" }
         };
+
+        public static string FileNameOf(string path)
+        {
+            return Path.GetFileName((path ?? "").Replace('\\', '/'));
+        }
+
+        public static string[] FamilyOf(string exePath)
+        {
+            string name = FileNameOf(exePath);
+            if (string.IsNullOrWhiteSpace(name)) return new string[0];
+            return Families.FirstOrDefault(f => f.Contains(name, StringComparer.OrdinalIgnoreCase)) ?? new[] { name };
+        }
+
+        // Identifica a pré-configuração correspondente a um executável escolhido pelo técnico.
+        public static ToolConfig MatchPreset(string exePath, IEnumerable<ToolConfig> existing = null, ToolConfig ignore = null)
+        {
+            var names = FamilyOf(exePath);
+            if (names.Length == 0) return null;
+            var matches = AppConfig.PresetTools()
+                .Where(p => names.Contains(FileNameOf(p.Exe), StringComparer.OrdinalIgnoreCase)).ToList();
+            if (matches.Count == 0) return null;
+            if (existing != null)
+            {
+                var usedCodes = new HashSet<string>(
+                    existing.Where(t => t != null && t != ignore && !string.IsNullOrWhiteSpace(t.Arquivo)).Select(t => t.Arquivo),
+                    StringComparer.OrdinalIgnoreCase);
+                var unused = matches.FirstOrDefault(p => !usedCodes.Contains(p.Arquivo));
+                if (unused != null) return unused;
+            }
+            return matches[0];
+        }
 
         public static bool Compatible(string path, bool is64Bit)
         {
@@ -119,16 +151,34 @@ namespace Diagnostico
             {
                 if (tool.IsUrl || tool.IsInternal) { found++; continue; }
                 if (tool.Exists && Compatible(tool.FullPath, is64Bit)) { found++; continue; }
-                string name = Path.GetFileName(tool.Exe ?? "");
-                if (string.IsNullOrWhiteSpace(name)) continue;
-                var names = Families.FirstOrDefault(f => f.Contains(name, StringComparer.OrdinalIgnoreCase)) ?? new[] { name };
-                string hit = available.Where(f => names.Contains(Path.GetFileName(f), StringComparer.OrdinalIgnoreCase) && Compatible(f, is64Bit))
-                    .OrderBy(f => is64Bit && Path.GetFileNameWithoutExtension(f).EndsWith("64", StringComparison.OrdinalIgnoreCase) ? 0 : 1).FirstOrDefault();
+                var names = FamilyOf(tool.Exe);
+                if (names.Length == 0) continue;
+                string hit = available.Where(f => names.Contains(FileNameOf(f), StringComparer.OrdinalIgnoreCase) && Compatible(f, is64Bit))
+                    .OrderBy(f => is64Bit && Path.GetFileNameWithoutExtension(FileNameOf(f)).EndsWith("64", StringComparison.OrdinalIgnoreCase) ? 0 : 1).FirstOrDefault();
                 if (hit == null) continue;
                 tool.Exe = AppPaths.ToRelative(hit);
                 found++;
             }
             return found;
+        }
+
+        // Adiciona automaticamente na lista os programas pré-configurados que forem encontrados na pasta de ferramentas.
+        public static int DiscoverPresets(AppConfig cfg, IEnumerable<string> files, bool is64Bit)
+        {
+            var available = files.ToList();
+            int added = 0;
+            foreach (var preset in AppConfig.PresetTools())
+            {
+                if (cfg.Programas.Any(t => string.Equals(t.Arquivo, preset.Arquivo, StringComparison.OrdinalIgnoreCase))) continue;
+                var names = FamilyOf(preset.Exe);
+                string hit = available.Where(f => names.Contains(FileNameOf(f), StringComparer.OrdinalIgnoreCase) && Compatible(f, is64Bit))
+                    .OrderBy(f => is64Bit && Path.GetFileNameWithoutExtension(FileNameOf(f)).EndsWith("64", StringComparison.OrdinalIgnoreCase) ? 0 : 1).FirstOrDefault();
+                if (hit == null) continue;
+                preset.Exe = AppPaths.ToRelative(hit);
+                cfg.Programas.Add(preset);
+                added++;
+            }
+            return added;
         }
     }
 }

@@ -19,7 +19,7 @@ namespace Diagnostico
         readonly RoundPanel listPanel = new RoundPanel { Radius = 8 };
         readonly Label listLbl = UI.Label("ETAPAS", Theme.Body);
         readonly FlatButton findAll = new FlatButton("Procurar todos");
-        readonly RowList list = new RowList { RowHeight = 54 };
+        readonly RowList list = new RowList { RowHeight = 54, Reorderable = true };
         readonly FlatButton add = new FlatButton("Adicionar programa");
 
         readonly RoundPanel detail = new RoundPanel { AutoScroll = true };
@@ -32,7 +32,8 @@ namespace Diagnostico
                            file = new DarkInput(), minTime = new DarkInput();
         readonly DarkSelect mode = new DarkSelect("manual", "automatico"), win = new DarkSelect("maximizada", "normal", "minimizada");
         readonly FlatButton locate = new FlatButton("Localizar"), open = new FlatButton("Abrir"), remove = new FlatButton("Remover");
-        readonly DarkCheck maxBefore = new DarkCheck("Maximizar antes do print"), quick = new DarkCheck("Incluir no modo rápido"),
+        readonly DarkCheck enabledCheck = new DarkCheck("Etapa ativa"),
+                           maxBefore = new DarkCheck("Maximizar antes do print"), quick = new DarkCheck("Incluir no modo rápido"),
                            stress = new DarkCheck("Etapa de estresse"), periph = new DarkCheck("Etapa de periféricos"),
                            conditional = new DarkCheck("Condicional");
 
@@ -45,10 +46,23 @@ namespace Diagnostico
             toolsPanel.Controls.AddRange(new Control[] { toolsLbl, toolsPath, toolsChoose });
             listPanel.Controls.AddRange(new Control[] { listLbl, findAll, list, add, remove });
             detail.Controls.AddRange(new Control[] { name, exeLbl, exe, locate, open, modeLbl, mode, winLbl, win, waitLbl, wait,
-                maxBefore, quick, stress, periph, conditional, descLbl, desc, argsLbl, args, procLbl, proc, fileLbl, file, minLbl, minTime });
+                enabledCheck, maxBefore, quick, stress, periph, conditional, descLbl, desc, argsLbl, args, procLbl, proc, fileLbl, file, minLbl, minTime });
             Controls.AddRange(new Control[] { osPanel, toolsPanel, listPanel, detail });
             foreach (Control c in detail.Controls) if (c is DarkCheck) c.BackColor = Theme.Panel;
-            detail.Paint += (s, e) => { int lineY = Theme.S(76) + detail.AutoScrollPosition.Y; using (var p = new Pen(Theme.Line)) e.Graphics.DrawLine(p, Theme.S(20), lineY, detail.Width - Theme.S(20), lineY); };
+            detail.Paint += (s, e) =>
+            {
+                int scrollY = detail.AutoScrollPosition.Y;
+                int lineY = Theme.S(76) + scrollY;
+                using (var p = new Pen(Theme.Line)) e.Graphics.DrawLine(p, Theme.S(20), lineY, detail.Width - Theme.S(20), lineY);
+                if (current != null)
+                {
+                    Theme.Smooth(e.Graphics);
+                    string badge = current.IsInternal ? "Teste interno" : "Teste externo";
+                    var colors = current.IsInternal ? Theme.PillBlue : Theme.PillPurple;
+                    int right = detail.Width - Theme.S(20) - SystemInformation.VerticalScrollBarWidth;
+                    Theme.Pill(e.Graphics, badge, colors, new Rectangle(Theme.S(20), Theme.S(22) + scrollY, right - Theme.S(20), Theme.S(38)), Theme.Small, true);
+                }
+            };
 
             osChoose.Click += (s, e) => ChooseFolder(osPath, "Pasta onde as OS serão salvas", v => Session.Cfg.PastaOS = v);
             toolsChoose.Click += (s, e) => ChooseFolder(toolsPath, "Pasta onde estão os programas", v => Session.Cfg.PastaProgramas = v);
@@ -56,6 +70,14 @@ namespace Diagnostico
             toolsPath.Box.Leave += (s, e) => { if (toolsPath.Text.Trim() != "") { Session.Cfg.PastaProgramas = toolsPath.Text.Trim(); Session.Cfg.Save(); } };
 
             list.RowClick += (s, i) => ShowTool(list.Rows[i].Tag as ToolConfig);
+            list.RowMoved += (from, to) =>
+            {
+                var item = Session.Cfg.Programas[from];
+                Session.Cfg.Programas.RemoveAt(from);
+                Session.Cfg.Programas.Insert(to, item);
+                Session.Cfg.Save();
+                RefreshList();
+            };
             findAll.Click += (s, e) => FindAll();
             add.Click += (s, e) => Add();
             remove.Click += (s, e) => Remove();
@@ -70,6 +92,7 @@ namespace Diagnostico
             wait.ValueChanged += (s, e) => { int v; if (int.TryParse(wait.Text, out v)) Edit(t => t.Espera = Math.Max(1, v)); };
             mode.ValueChanged += (s, e) => Edit(t => t.Modo = mode.Value, true);
             win.ValueChanged += (s, e) => Edit(t => t.Janela = win.Value);
+            enabledCheck.CheckedChanged += (s, e) => { Edit(t => t.Desativado = !enabledCheck.Checked, true); UpdateActionButtons(); };
             maxBefore.CheckedChanged += (s, e) => Edit(t => t.MaximizarAntesPrint = maxBefore.Checked);
             quick.CheckedChanged += (s, e) => Edit(t => t.ModoRapido = quick.Checked);
             stress.CheckedChanged += (s, e) => Edit(t => t.SoEstresse = stress.Checked);
@@ -93,13 +116,35 @@ namespace Diagnostico
         {
             list.SetRows(Session.Cfg.Programas.Select(t => new ListRow
             {
-                Text = string.IsNullOrWhiteSpace(t.Nome) ? "(sem nome)" : t.Nome,
-                Badge = t.Exists ? "Encontrado" : "Não encontrado",
-                BadgeColors = t.Exists ? Theme.PillGreen : Theme.PillRed,
+                Text = (string.IsNullOrWhiteSpace(t.Nome) ? "(sem nome)" : t.Nome) + (t.Modo == "automatico" ? "  ⚡" : ""),
+                KindBadge = t.IsInternal ? "Interno" : "Externo",
+                KindColors = t.IsInternal ? Theme.PillBlue : Theme.PillPurple,
+                Sub = t.IsInternal ? "Embutido no programa" : t.IsUrl ? "Site (online)" : string.IsNullOrWhiteSpace(t.Exe) ? "Sem executável" : ToolDiscovery.FileNameOf(t.Exe),
+                Dimmed = t.Desativado,
+                Badge = t.Desativado ? "Desativado" : t.IsInternal ? "Ativo" : t.Exists ? "Encontrado" : "Não encontrado",
+                BadgeColors = t.Desativado ? Theme.PillGray : t.Exists ? Theme.PillGreen : Theme.PillRed,
                 Tag = t,
             }));
             list.SelectedIndex = Session.Cfg.Programas.IndexOf(current);
             list.Invalidate();
+        }
+
+        void LayoutListButtons()
+        {
+            int lw = listPanel.Width, bh = Theme.S(48), by = listPanel.Height - Theme.S(60);
+            int rmw = remove.PreferredWidth;
+            remove.SetBounds(lw - rmw - Theme.S(12), by, rmw, bh);
+            int aw = Math.Min(add.PreferredWidth, Math.Max(Theme.S(120), remove.Left - Theme.S(20)));
+            add.SetBounds(Theme.S(12), by, aw, bh);
+        }
+
+        void UpdateActionButtons()
+        {
+            bool on = current != null;
+            remove.Enabled = on;
+            remove.Text = on && current.IsInternal ? (current.Desativado ? "Ativar" : "Desativar") : "Remover";
+            if (listPanel.Width > 50) LayoutListButtons();
+            remove.Invalidate();
         }
 
         void ShowTool(ToolConfig t)
@@ -108,17 +153,22 @@ namespace Diagnostico
             loading = true;
             bool on = t != null;
             foreach (Control c in detail.Controls) c.Enabled = on;
-            remove.Enabled = on;
             if (t != null)
             {
                 name.Text = t.Nome; exe.Text = t.Exe; desc.Text = t.Descricao; args.Text = t.Argumentos; proc.Text = t.Processo;
                 wait.Text = t.Espera.ToString(); mode.Value = t.Modo; win.Value = t.Janela;
+                enabledCheck.Checked = !t.Desativado;
                 maxBefore.Checked = t.MaximizarAntesPrint; quick.Checked = t.ModoRapido; stress.Checked = t.SoEstresse; periph.Checked = t.SoPerifericos;
                 conditional.Checked = t.Condicional; file.Text = t.Arquivo; minTime.Text = t.MinutosMinimos.ToString();
+                exe.ReadOnly = t.IsInternal;
+                locate.Enabled = !t.IsInternal;
+                exeLbl.Text = t.IsInternal ? "Recurso interno (fixo do sistema)" : "Executável ou site (https://...)";
             }
             loading = false;
+            UpdateActionButtons();
             list.SelectedIndex = Session.Cfg.Programas.IndexOf(t);
             list.Invalidate();
+            detail.Invalidate();
             PerformLayout();
         }
 
@@ -145,16 +195,27 @@ namespace Diagnostico
 
         void Locate()
         {
-            if (current == null) return;
+            if (current == null || current.IsInternal) return;
             using (var dlg = new OpenFileDialog { Filter = "Programas|*.exe;*.bat;*.cmd|Todos|*.*", Title = "Executável de " + current.Nome })
             {
                 try { dlg.InitialDirectory = current.Exists ? Path.GetDirectoryName(current.FullPath) : Session.Cfg.ToolsRoot; } catch { }
                 if (dlg.ShowDialog(this) != DialogResult.OK) return;
-                exe.Text = AppPaths.ToRelative(dlg.FileName);
+                string rel = AppPaths.ToRelative(dlg.FileName);
+                var preset = ToolDiscovery.MatchPreset(dlg.FileName, Session.Cfg.Programas, current);
+                if (preset != null && (current.Nome == "Novo programa" || string.IsNullOrWhiteSpace(current.Arquivo) || string.Equals(current.Arquivo, preset.Arquivo, StringComparison.OrdinalIgnoreCase)))
+                {
+                    AppConfig.CopyPresetTo(preset, current, rel);
+                    Session.Cfg.Save();
+                    RefreshList();
+                    ShowTool(current);
+                    Toast.Show("Pré-configuração aplicada: " + current.Nome + (current.Modo == "automatico" ? " (modo automático ⚡)" : ""));
+                    return;
+                }
+                exe.Text = rel;
             }
         }
 
-        // Procura cada executável (pelo nome do arquivo) dentro da pasta dos programas.
+        // Procura cada executável (pelo nome do arquivo) dentro da pasta dos programas e adiciona pré-configurados encontrados.
         async void FindAll()
         {
             Cursor = Cursors.WaitCursor;
@@ -164,18 +225,57 @@ namespace Diagnostico
                 var roots = ToolDiscovery.SearchRoots(Session.Cfg).ToList();
                 var files = await System.Threading.Tasks.Task.Run(() => ToolDiscovery.Executables(roots));
                 if (IsDisposed) return;
+                int added = ToolDiscovery.DiscoverPresets(Session.Cfg, files, Environment.Is64BitOperatingSystem);
                 int found = ToolDiscovery.FindMissing(Session.Cfg, files, Environment.Is64BitOperatingSystem);
                 int missing = Session.Cfg.Programas.Count - found;
                 Session.Cfg.Save();
                 RefreshList();
                 if (current != null) ShowTool(current);
-                Toast.Show(found + " encontrado(s), " + missing + " não encontrado(s).", missing > 0);
+                else if (Session.Cfg.Programas.Count > 0) ShowTool(Session.Cfg.Programas[0]);
+                string extra = added > 0 ? " (" + added + " pré-configurado(s) adicionado(s))" : "";
+                Toast.Show(found + " encontrado(s), " + missing + " não encontrado(s)" + extra + ".", missing > 0);
             }
             catch (Exception ex) { Toast.Show("Erro na busca: " + ex.Message, true); }
             finally { if (!IsDisposed) { Cursor = Cursors.Default; findAll.Enabled = true; } }
         }
 
         void Add()
+        {
+            var items = new List<Tuple<string, Action>>();
+            foreach (var p in AppConfig.PresetTools())
+            {
+                var preset = p;
+                string label = preset.Nome + (preset.Modo == "automatico" ? "  (automático ⚡)" : "");
+                items.Add(UI.Item(label, () => AddPreset(preset)));
+            }
+            items.Add(null);
+            items.Add(UI.Item("Outro programa (.exe, .bat ou site)...", AddCustom));
+            var menu = UI.Menu(items.ToArray());
+            menu.Show(add, new Point(0, -menu.PreferredSize.Height - 2));
+        }
+
+        void AddPreset(ToolConfig preset)
+        {
+            var t = new ToolConfig();
+            AppConfig.CopyPresetTo(preset, t);
+            try
+            {
+                var files = ToolDiscovery.Executables(ToolDiscovery.SearchRoots(Session.Cfg));
+                var names = ToolDiscovery.FamilyOf(t.Exe);
+                bool is64 = Environment.Is64BitOperatingSystem;
+                string hit = files.Where(f => names.Contains(ToolDiscovery.FileNameOf(f), StringComparer.OrdinalIgnoreCase) && ToolDiscovery.Compatible(f, is64))
+                    .OrderBy(f => is64 && Path.GetFileNameWithoutExtension(ToolDiscovery.FileNameOf(f)).EndsWith("64", StringComparison.OrdinalIgnoreCase) ? 0 : 1).FirstOrDefault();
+                if (hit != null) t.Exe = AppPaths.ToRelative(hit);
+            }
+            catch { }
+            Session.Cfg.Programas.Add(t);
+            Session.Cfg.Save();
+            RefreshList();
+            ShowTool(t);
+            if (!t.Exists) Locate();
+        }
+
+        void AddCustom()
         {
             var t = new ToolConfig { Nome = "Novo programa", Exe = "", ModoRapido = false };
             Session.Cfg.Programas.Add(t);
@@ -184,13 +284,22 @@ namespace Diagnostico
             ShowTool(t);
             Locate();
             if (string.IsNullOrWhiteSpace(t.Nome) || t.Nome == "Novo programa")
-                if (!string.IsNullOrEmpty(t.Exe)) name.Text = Path.GetFileNameWithoutExtension(t.Exe);
+                if (!string.IsNullOrEmpty(t.Exe)) name.Text = Path.GetFileNameWithoutExtension(ToolDiscovery.FileNameOf(t.Exe));
             name.Focus(); name.SelectAll();
         }
 
         void Remove()
         {
             if (current == null) return;
+            if (current.IsInternal)
+            {
+                current.Desativado = !current.Desativado;
+                Session.Cfg.Save();
+                RefreshList();
+                ShowTool(current);
+                Toast.Show(current.Nome + (current.Desativado ? " desativado." : " ativado."));
+                return;
+            }
             if (MessageBox.Show(this, "Remover " + current.Nome + " da lista?", "Remover programa", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
             int i = Session.Cfg.Programas.IndexOf(current);
             Session.Cfg.Programas.Remove(current);
@@ -226,17 +335,14 @@ namespace Diagnostico
             int hh = Theme.S(58), fw = findAll.PreferredWidth;
             listLbl.SetBounds(Theme.S(12), 2, lw - fw - Theme.S(30), hh);
             findAll.SetBounds(lw - fw - Theme.S(14), Theme.S(10), fw, hh - Theme.S(14));
-            int aw = add.PreferredWidth;
-            add.SetBounds(Theme.S(10), listPanel.Height - Theme.S(60), aw, Theme.S(48));
-            int rmw = remove.PreferredWidth;
-            remove.SetBounds(lw - rmw - Theme.S(14), listPanel.Height - Theme.S(60), rmw, Theme.S(48));
+            LayoutListButtons();
             list.SetBounds(2, hh + 4, lw - 4, listPanel.Height - hh - Theme.S(72));
 
             int dx = pad + lw + gap, dw = Width - dx - pad;
             detail.SetBounds(dx, y0, dw, bottom - y0);
             int scrollY = detail.AutoScrollPosition.Y;
             int x = ip, w = dw - ip * 2 - SystemInformation.VerticalScrollBarWidth, y = Theme.S(22) + scrollY;
-            name.SetBounds(x, y + Theme.S(6), w, Theme.S(34)); y += Theme.S(56);
+            name.SetBounds(x, y + Theme.S(6), Math.Max(Theme.S(120), w - Theme.S(140)), Theme.S(34)); y += Theme.S(56);
             y += Theme.S(8);
 
             int ow = open.PreferredWidth, lw2 = locate.PreferredWidth;
@@ -253,7 +359,7 @@ namespace Diagnostico
 
             // checkboxes em fluxo
             int cx = x, ch = Theme.S(34);
-            foreach (var c in new[] { maxBefore, quick, stress, periph, conditional })
+            foreach (var c in new[] { enabledCheck, maxBefore, quick, stress, periph, conditional })
             {
                 int pw = c.PreferredWidth + Theme.S(8);
                 if (cx + pw > x + w && cx > x) { cx = x; y += ch + Theme.S(8); }
