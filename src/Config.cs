@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -52,13 +53,125 @@ namespace Diagnostico
             }
         }
 
-        [IgnoreDataMember] public bool IsUrl { get { return Exe != null && Regex.IsMatch(Exe.Trim(), "^https?://", RegexOptions.IgnoreCase); } }
+        [IgnoreDataMember] public bool IsUrl { get { return LooksLikeUrl(Exe); } }
         // Teste embutido no programa (offline): interno:teclado, interno:audio
         [IgnoreDataMember] public bool IsInternal { get { return Exe != null && Exe.Trim().StartsWith(InternalTests.Prefix, StringComparison.OrdinalIgnoreCase); } }
         // Teste interno que tem um site equivalente (hoje só o teclado; o de áudio testa os alto-falantes, que não têm versão online)
         [IgnoreDataMember] public bool HasOnlineVersion { get { return IsInternal && Exe.Trim().Substring(InternalTests.Prefix.Length).Equals("teclado", StringComparison.OrdinalIgnoreCase); } }
-        [IgnoreDataMember] public string FullPath { get { return IsUrl || IsInternal ? Exe.Trim() : AppPaths.Resolve(Exe); } }
-        [IgnoreDataMember] public bool Exists { get { try { return IsUrl || IsInternal || (!string.IsNullOrWhiteSpace(Exe) && File.Exists(FullPath)); } catch { return false; } } }
+        [IgnoreDataMember] public string FullPath { get { return IsInternal ? Exe.Trim() : IsUrl ? NormalizeUrl(Exe) : AppPaths.Resolve(Exe); } }
+        [IgnoreDataMember]
+        public bool Exists
+        {
+            get
+            {
+                try
+                {
+                    if (IsInternal) return true;
+                    if (IsUrl) return HasValidUrl(Exe) || ExtraUrls().Count > 0;
+                    return !string.IsNullOrWhiteSpace(Exe) && File.Exists(FullPath);
+                }
+                catch { return false; }
+            }
+        }
+
+        public static bool LooksLikeUrl(string s)
+        {
+            if (string.IsNullOrWhiteSpace(s)) return false;
+            s = Regex.Replace(s.Trim(), @"^(https?://)+", "https://", RegexOptions.IgnoreCase);
+            if (Regex.IsMatch(s, "^https?://", RegexOptions.IgnoreCase)) return true;
+            if (s.IndexOf('\\') >= 0 || s.StartsWith(".") || s.StartsWith("%") || Regex.IsMatch(s, @"^[a-zA-Z]:")) return false;
+            if (Regex.IsMatch(s, @"\.(exe|bat|cmd|msc|cpl)$", RegexOptions.IgnoreCase)) return false;
+            return Regex.IsMatch(s, @"^(www\.)?[a-z0-9-]+(\.[a-z0-9-]+)+(/.*)?$", RegexOptions.IgnoreCase);
+        }
+
+        public static bool HasValidUrl(string s)
+        {
+            if (!LooksLikeUrl(s)) return false;
+            string n = Regex.Replace(s.Trim(), @"^(https?://)+", "", RegexOptions.IgnoreCase).Trim('/');
+            return n.Length > 0 && n.IndexOf('.') > 0;
+        }
+
+        public static string NormalizeUrl(string s)
+        {
+            s = (s ?? "").Trim();
+            if (s == "") return "";
+            s = Regex.Replace(s, @"^(https?://)+", "https://", RegexOptions.IgnoreCase);
+            if (Regex.IsMatch(s, "^https?://$", RegexOptions.IgnoreCase)) return s;
+            return Regex.IsMatch(s, "^https?://", RegexOptions.IgnoreCase) ? s : "https://" + s;
+        }
+
+        public List<string> ExtraUrls()
+        {
+            if (!IsUrl && string.IsNullOrWhiteSpace(Argumentos)) return new List<string>();
+            return (Argumentos ?? "")
+                .Split(new[] { ' ', ';', ',', '\r', '\n', '\t' }, StringSplitOptions.RemoveEmptyEntries)
+                .Where(LooksLikeUrl)
+                .ToList();
+        }
+
+        public List<string> AllUrls()
+        {
+            var list = new List<string>();
+            if (HasValidUrl(Exe)) list.Add(NormalizeUrl(Exe));
+            foreach (var u in ExtraUrls())
+                if (HasValidUrl(u)) list.Add(NormalizeUrl(u));
+            return list;
+        }
+
+        public static string NameFromUrl(string url)
+        {
+            if (!HasValidUrl(url)) return "";
+            string host = Regex.Replace(url.Trim(), "^https?://", "", RegexOptions.IgnoreCase);
+            int slash = host.IndexOfAny(new[] { '/', '?', '#', ':' });
+            if (slash >= 0) host = host.Substring(0, slash);
+            host = Regex.Replace(host, @"^(www|pt|br|en|es|app|web|m)\.", "", RegexOptions.IgnoreCase);
+            host = Regex.Replace(host, @"\.(com\.br|net\.br|org\.br|gov\.br|edu\.br|co\.uk|com|net|org|io|dev|app|me|co|br|info|online|site|tech|test|tools)$", "", RegexOptions.IgnoreCase);
+            if (host.IndexOf('.') >= 0) host = host.Split('.')[0];
+            host = Regex.Replace(host.Replace('-', ' ').Replace('_', ' '), @"\s+", " ").Trim();
+            if (host == "") return "";
+            return CultureInfo.CurrentCulture.TextInfo.ToTitleCase(host.ToLowerInvariant());
+        }
+
+        public static string AutoName(string exeOrUrl, IEnumerable<string> extraUrls = null)
+        {
+            var extras = extraUrls == null ? new List<string>() : extraUrls.Where(HasValidUrl).ToList();
+            if (LooksLikeUrl(exeOrUrl) || extras.Count > 0)
+            {
+                var names = new List<string>();
+                if (HasValidUrl(exeOrUrl))
+                {
+                    string n = NameFromUrl(exeOrUrl);
+                    if (n != "") names.Add(n);
+                }
+                foreach (var u in extras)
+                {
+                    string n = NameFromUrl(u);
+                    if (n != "" && !names.Contains(n, StringComparer.OrdinalIgnoreCase)) names.Add(n);
+                }
+                return names.Count == 0 ? "" : string.Join(" + ", names.Take(3));
+            }
+            if (string.IsNullOrWhiteSpace(exeOrUrl) || exeOrUrl.Trim().StartsWith(InternalTests.Prefix, StringComparison.OrdinalIgnoreCase))
+                return "";
+            var preset = ToolDiscovery.MatchPreset(exeOrUrl);
+            if (preset != null && !string.IsNullOrWhiteSpace(preset.Nome)) return preset.Nome;
+            string raw = Path.GetFileNameWithoutExtension(ToolDiscovery.FileNameOf(exeOrUrl));
+            if (string.IsNullOrWhiteSpace(raw)) return "";
+            raw = Regex.Replace(raw, @"([_-](x64|x86|64|32|gui|win64|win32))+$", "", RegexOptions.IgnoreCase);
+            if (raw.Length > 4) raw = Regex.Replace(raw, @"(?<=[a-zA-Z])(64|32)$", "");
+            raw = Regex.Replace(raw.Replace('_', ' '), @"\s+", " ").Trim();
+            if (raw.Length > 0 && raw == raw.ToLowerInvariant())
+                raw = char.ToUpper(raw[0]) + raw.Substring(1);
+            return raw;
+        }
+
+        public static string AutoFileCode(string nome)
+        {
+            string clean = (nome ?? "").Trim();
+            if (clean == "" || clean == "Novo programa" || clean == "Novo site") return "";
+            clean = Regex.Replace(PhotoStore.Sanitize(clean), @"[\s\+]+", "_").Trim('_');
+            if (clean == "") return "";
+            return clean.StartsWith("PRINT_", StringComparison.OrdinalIgnoreCase) ? clean : "PRINT_" + clean;
+        }
 
         // Código usado no nome do arquivo: OS_<numero>_<Codigo>.png
         [IgnoreDataMember]
@@ -66,7 +179,8 @@ namespace Diagnostico
         {
             get
             {
-                string c = string.IsNullOrWhiteSpace(Arquivo) ? "PRINT_" + (Nome ?? "Print") : Arquivo;
+                string c = string.IsNullOrWhiteSpace(Arquivo) ? AutoFileCode(Nome) : Arquivo;
+                if (string.IsNullOrWhiteSpace(c)) c = "PRINT_Print";
                 return PhotoStore.Sanitize(c).Replace(' ', '_');
             }
         }

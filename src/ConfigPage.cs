@@ -23,44 +23,51 @@ namespace Diagnostico
         readonly FlatButton add = new FlatButton("Adicionar programa");
 
         readonly RoundPanel detail = new RoundPanel { AutoScroll = true };
-        readonly TextBox name = new TextBox { BorderStyle = BorderStyle.None, BackColor = Theme.Panel, ForeColor = Theme.Text, Font = Theme.Heading };
+        readonly Label nameLbl = UI.Label("Nome da etapa");
+        readonly DarkInput name = new DarkInput();
         readonly Label exeLbl = UI.Label("Executável ou site (https://...)"), modeLbl = UI.Label("Modo"), winLbl = UI.Label("Janela"),
                        waitLbl = UI.Label("Espera print auto (s)"), descLbl = UI.Label("Descrição (aparece na lista)"),
                        argsLbl = UI.Label("Argumentos"), procLbl = UI.Label("Processo (se diferente do .exe)"),
-                       fileLbl = UI.Label("Nome da evidência (arquivo)"), minLbl = UI.Label("Tempo mínimo (min)");
+                       fileLbl = UI.Label("Nome da evidência (arquivo)"), minLbl = UI.Label("Tempo mínimo (min)"),
+                       behaviorLbl = UI.Label("Comportamento da etapa"), modesLbl = UI.Label("Modos de análise em que entra");
         readonly DarkInput exe = new DarkInput(), desc = new DarkInput(), wait = new DarkInput(), args = new DarkInput(), proc = new DarkInput(),
                            file = new DarkInput(), minTime = new DarkInput();
         readonly DarkSelect mode = new DarkSelect("manual", "automatico"), win = new DarkSelect("maximizada", "normal", "minimizada");
-        readonly FlatButton locate = new FlatButton("Localizar"), open = new FlatButton("Abrir"), remove = new FlatButton("Remover");
-        readonly DarkCheck enabledCheck = new DarkCheck("Etapa ativa"),
-                           maxBefore = new DarkCheck("Maximizar antes do print"), quick = new DarkCheck("Incluir no modo rápido"),
+        readonly FlatButton locate = new FlatButton("Localizar"), addUrl = new FlatButton("+ Adicionar URL"), open = new FlatButton("Abrir"), remove = new FlatButton("Remover");
+        readonly ToggleSwitch enabledCheck = new ToggleSwitch("Etapa ativa", "Ativado", "Desativado");
+        readonly DarkCheck maxBefore = new DarkCheck("Maximizar antes do print"), quick = new DarkCheck("Modo rápido"),
                            stress = new DarkCheck("Etapa de estresse"), periph = new DarkCheck("Etapa de periféricos"),
-                           conditional = new DarkCheck("Condicional");
+                           conditional = new DarkCheck("Condicional (opcional)");
+        readonly List<Tuple<DarkInput, FlatButton>> extraUrls = new List<Tuple<DarkInput, FlatButton>>();
 
         ToolConfig current;
         bool loading;
+        bool isSiteMode;
+        string autoName = "";
+        string autoFile = "";
 
         public ConfigPage()
         {
             osPanel.Controls.AddRange(new Control[] { osLbl, osPath, osChoose });
             toolsPanel.Controls.AddRange(new Control[] { toolsLbl, toolsPath, toolsChoose });
             listPanel.Controls.AddRange(new Control[] { listLbl, findAll, list, add, remove });
-            detail.Controls.AddRange(new Control[] { name, exeLbl, exe, locate, open, modeLbl, mode, winLbl, win, waitLbl, wait,
-                enabledCheck, maxBefore, quick, stress, periph, conditional, descLbl, desc, argsLbl, args, procLbl, proc, fileLbl, file, minLbl, minTime });
+            detail.Controls.AddRange(new Control[] { nameLbl, name, exeLbl, exe, locate, addUrl, open, modeLbl, mode, winLbl, win, waitLbl, wait,
+                behaviorLbl, enabledCheck, conditional, maxBefore, modesLbl, quick, stress, periph,
+                descLbl, desc, argsLbl, args, procLbl, proc, fileLbl, file, minLbl, minTime });
             Controls.AddRange(new Control[] { osPanel, toolsPanel, listPanel, detail });
-            foreach (Control c in detail.Controls) if (c is DarkCheck) c.BackColor = Theme.Panel;
+            foreach (Control c in detail.Controls) if (c is DarkCheck || c is ToggleSwitch) c.BackColor = Theme.Panel;
             detail.Paint += (s, e) =>
             {
                 int scrollY = detail.AutoScrollPosition.Y;
-                int lineY = Theme.S(76) + scrollY;
+                int lineY = Theme.S(102) + scrollY;
                 using (var p = new Pen(Theme.Line)) e.Graphics.DrawLine(p, Theme.S(20), lineY, detail.Width - Theme.S(20), lineY);
                 if (current != null)
                 {
                     Theme.Smooth(e.Graphics);
-                    string badge = current.IsInternal ? "Teste interno" : "Teste externo";
-                    var colors = current.IsInternal ? Theme.PillBlue : Theme.PillPurple;
+                    string badge = current.IsInternal ? "Teste interno" : (isSiteMode || current.IsUrl) ? "Site de teste" : "Teste externo";
+                    var colors = current.IsInternal ? Theme.PillBlue : (isSiteMode || current.IsUrl) ? Theme.PillGreen : Theme.PillPurple;
                     int right = detail.Width - Theme.S(20) - SystemInformation.VerticalScrollBarWidth;
-                    Theme.Pill(e.Graphics, badge, colors, new Rectangle(Theme.S(20), Theme.S(22) + scrollY, right - Theme.S(20), Theme.S(38)), Theme.Small, true);
+                    Theme.Pill(e.Graphics, badge, colors, new Rectangle(Theme.S(20), Theme.S(10) + scrollY, right - Theme.S(20), Theme.S(30)), Theme.Small, true);
                 }
             };
 
@@ -82,10 +89,52 @@ namespace Diagnostico
             add.Click += (s, e) => Add();
             remove.Click += (s, e) => Remove();
             locate.Click += (s, e) => Locate();
+            addUrl.Click += (s, e) => AddExtraUrlRow("", true);
             open.Click += (s, e) => { if (current != null) Session.Launch(current); };
 
-            name.TextChanged += (s, e) => Edit(t => t.Nome = name.Text, true);
-            exe.ValueChanged += (s, e) => Edit(t => t.Exe = exe.Text.Trim(), true);
+            name.ValueChanged += (s, e) =>
+            {
+                if (loading || current == null) return;
+                current.Nome = name.Text;
+                ApplyAutoFile(false);
+                Session.Cfg.Save();
+                RefreshList();
+            };
+            name.Box.Leave += (s, e) =>
+            {
+                if (current != null && string.IsNullOrWhiteSpace(name.Text))
+                {
+                    ApplyAutoName(true);
+                    Session.Cfg.Save();
+                    RefreshList();
+                }
+            };
+            exe.ValueChanged += (s, e) =>
+            {
+                if (loading || current == null) return;
+                current.Exe = exe.Text.Trim();
+                bool looksUrl = !current.IsInternal && ToolConfig.LooksLikeUrl(current.Exe);
+                if (looksUrl != isSiteMode && (looksUrl || !string.IsNullOrEmpty(current.Exe)))
+                {
+                    isSiteMode = looksUrl;
+                    if (!isSiteMode) ClearExtraUrlRows();
+                    UpdateSiteControls();
+                    PerformLayout();
+                    detail.Invalidate();
+                }
+                ApplyAutoName(false);
+                Session.Cfg.Save();
+                RefreshList();
+            };
+            exe.Box.Leave += (s, e) =>
+            {
+                if (loading || current == null || current.IsInternal) return;
+                if ((isSiteMode || current.IsUrl) && ToolConfig.HasValidUrl(exe.Text))
+                {
+                    string norm = ToolConfig.NormalizeUrl(exe.Text);
+                    if (norm != exe.Text) { loading = true; exe.Text = norm; loading = false; current.Exe = norm; Session.Cfg.Save(); RefreshList(); }
+                }
+            };
             desc.ValueChanged += (s, e) => Edit(t => t.Descricao = desc.Text);
             args.ValueChanged += (s, e) => Edit(t => t.Argumentos = args.Text);
             proc.ValueChanged += (s, e) => Edit(t => t.Processo = proc.Text.Trim());
@@ -99,6 +148,14 @@ namespace Diagnostico
             periph.CheckedChanged += (s, e) => Edit(t => t.SoPerifericos = periph.Checked);
             conditional.CheckedChanged += (s, e) => Edit(t => t.Condicional = conditional.Checked);
             file.ValueChanged += (s, e) => Edit(t => t.Arquivo = file.Text.Trim());
+            file.Box.Leave += (s, e) =>
+            {
+                if (current != null && string.IsNullOrWhiteSpace(file.Text))
+                {
+                    ApplyAutoFile(true);
+                    Session.Cfg.Save();
+                }
+            };
             minTime.ValueChanged += (s, e) => { int v; if (int.TryParse(minTime.Text, out v)) Edit(t => t.MinutosMinimos = Math.Max(0, v)); };
         }
 
@@ -112,18 +169,173 @@ namespace Diagnostico
 
         public void OnLeave() { Session.Cfg.Save(); }
 
+        List<string> CurrentExtraUrls()
+        {
+            return extraUrls.Select(r => r.Item1.Text.Trim()).Where(s => s != "").ToList();
+        }
+
+        void ApplyAutoName(bool forceIfEmpty)
+        {
+            if (current == null || current.IsInternal) return;
+            string suggested = ToolConfig.AutoName(current.Exe, isSiteMode ? CurrentExtraUrls() : current.ExtraUrls());
+            if (string.IsNullOrWhiteSpace(suggested)) return;
+            string cur = (current.Nome ?? "").Trim();
+            bool canAuto = forceIfEmpty || cur == "" || cur == "Novo programa" || cur == "Novo site" ||
+                           (!string.IsNullOrEmpty(autoName) && string.Equals(cur, autoName, StringComparison.OrdinalIgnoreCase));
+            autoName = suggested;
+            if (canAuto && cur != suggested)
+            {
+                current.Nome = suggested;
+                bool prev = loading;
+                loading = true;
+                name.Text = suggested;
+                loading = prev;
+                ApplyAutoFile(false);
+            }
+        }
+
+        void ApplyAutoFile(bool forceIfEmpty)
+        {
+            if (current == null || current.IsInternal) return;
+            string suggested = ToolConfig.AutoFileCode(current.Nome);
+            if (string.IsNullOrWhiteSpace(suggested)) return;
+            string cur = (current.Arquivo ?? "").Trim();
+            bool canAuto = forceIfEmpty || cur == "" ||
+                           (!string.IsNullOrEmpty(autoFile) && string.Equals(cur, autoFile, StringComparison.OrdinalIgnoreCase));
+            autoFile = suggested;
+            if (canAuto && cur != suggested)
+            {
+                current.Arquivo = suggested;
+                bool prev = loading;
+                loading = true;
+                file.Text = suggested;
+                loading = prev;
+            }
+        }
+
+        void ClearExtraUrlRows()
+        {
+            foreach (var row in extraUrls)
+            {
+                detail.Controls.Remove(row.Item1);
+                detail.Controls.Remove(row.Item2);
+                row.Item1.Dispose();
+                row.Item2.Dispose();
+            }
+            extraUrls.Clear();
+        }
+
+        void AddExtraUrlRow(string initialUrl, bool focusNew)
+        {
+            if (current == null || current.IsInternal) return;
+            if (!isSiteMode)
+            {
+                isSiteMode = true;
+                UpdateSiteControls();
+            }
+            var input = new DarkInput(initialUrl ?? "");
+            var rmBtn = new FlatButton("Remover");
+            Tuple<DarkInput, FlatButton> row = null;
+            row = Tuple.Create(input, rmBtn);
+            input.ValueChanged += (s, e) =>
+            {
+                if (loading || current == null) return;
+                SyncExtraUrlsToArgs();
+                ApplyAutoName(false);
+                Session.Cfg.Save();
+                RefreshList();
+            };
+            input.Box.Leave += (s, e) =>
+            {
+                if (loading || current == null) return;
+                if (ToolConfig.HasValidUrl(input.Text))
+                {
+                    string norm = ToolConfig.NormalizeUrl(input.Text);
+                    if (norm != input.Text) { loading = true; input.Text = norm; loading = false; SyncExtraUrlsToArgs(); Session.Cfg.Save(); RefreshList(); }
+                }
+            };
+            rmBtn.Click += (s, e) =>
+            {
+                extraUrls.Remove(row);
+                detail.Controls.Remove(input);
+                detail.Controls.Remove(rmBtn);
+                input.Dispose();
+                rmBtn.Dispose();
+                SyncExtraUrlsToArgs();
+                ApplyAutoName(false);
+                Session.Cfg.Save();
+                RefreshList();
+                PerformLayout();
+            };
+            extraUrls.Add(row);
+            detail.Controls.Add(input);
+            detail.Controls.Add(rmBtn);
+            if (!loading)
+            {
+                PerformLayout();
+                if (focusNew)
+                {
+                    if (string.IsNullOrEmpty(initialUrl)) { input.Text = "https://"; input.Box.Focus(); input.Box.SelectAll(); }
+                    else input.Box.Focus();
+                }
+            }
+        }
+
+        void SyncExtraUrlsToArgs()
+        {
+            if (current == null || !isSiteMode) return;
+            var urls = extraUrls
+                .Select(r => r.Item1.Text.Trim())
+                .Where(ToolConfig.HasValidUrl)
+                .Select(ToolConfig.NormalizeUrl)
+                .ToList();
+            current.Argumentos = string.Join(" ", urls);
+            bool prev = loading;
+            loading = true;
+            args.Text = current.Argumentos;
+            loading = prev;
+        }
+
+        bool IsExternalExe
+        {
+            get { return current != null && !current.IsInternal && !isSiteMode && !current.IsUrl; }
+        }
+
+        void UpdateSiteControls()
+        {
+            bool on = current != null;
+            bool internalTool = on && current.IsInternal;
+            bool extExe = IsExternalExe;
+            exe.ReadOnly = internalTool;
+            locate.Visible = extExe;
+            locate.Enabled = on && extExe;
+            addUrl.Visible = isSiteMode && !internalTool;
+            addUrl.Enabled = on && isSiteMode && !internalTool;
+            exeLbl.Text = internalTool ? "Recurso interno (fixo do sistema)"
+                        : isSiteMode ? "URL do site (https://...)"
+                        : "Executável (.exe, .bat) ou site (https://...)";
+
+            foreach (Control c in new Control[] { modeLbl, mode, winLbl, win, waitLbl, wait, minLbl, minTime, maxBefore, argsLbl, args, procLbl, proc })
+                c.Visible = extExe;
+        }
+
         void RefreshList()
         {
-            list.SetRows(Session.Cfg.Programas.Select(t => new ListRow
+            list.SetRows(Session.Cfg.Programas.Select(t =>
             {
-                Text = (string.IsNullOrWhiteSpace(t.Nome) ? "(sem nome)" : t.Nome) + (t.Modo == "automatico" ? "  ⚡" : ""),
-                KindBadge = t.IsInternal ? "Interno" : "Externo",
-                KindColors = t.IsInternal ? Theme.PillBlue : Theme.PillPurple,
-                Sub = t.IsInternal ? "Embutido no programa" : t.IsUrl ? "Site (online)" : string.IsNullOrWhiteSpace(t.Exe) ? "Sem executável" : ToolDiscovery.FileNameOf(t.Exe),
-                Dimmed = t.Desativado,
-                Badge = t.Desativado ? "Desativado" : t.IsInternal ? "Ativo" : t.Exists ? "Encontrado" : "Não encontrado",
-                BadgeColors = t.Desativado ? Theme.PillGray : t.Exists ? Theme.PillGreen : Theme.PillRed,
-                Tag = t,
+                int urlCount = t.IsUrl ? t.AllUrls().Count : 0;
+                string siteSub = urlCount > 1 ? "Site (online · " + urlCount + " URLs)" : "Site (online)";
+                return new ListRow
+                {
+                    Text = (string.IsNullOrWhiteSpace(t.Nome) ? "(sem nome)" : t.Nome) + (t.Modo == "automatico" ? "  ⚡" : ""),
+                    KindBadge = t.IsInternal ? "Interno" : t.IsUrl ? "Site" : "Externo",
+                    KindColors = t.IsInternal ? Theme.PillBlue : t.IsUrl ? Theme.PillGreen : Theme.PillPurple,
+                    Sub = t.IsInternal ? "Embutido no programa" : t.IsUrl ? siteSub : string.IsNullOrWhiteSpace(t.Exe) ? "Sem executável" : ToolDiscovery.FileNameOf(t.Exe),
+                    Dimmed = t.Desativado,
+                    Badge = t.Desativado ? "Desativado" : t.IsInternal ? "Ativo" : t.Exists ? "Encontrado" : "Não encontrado",
+                    BadgeColors = t.Desativado ? Theme.PillGray : t.Exists ? Theme.PillGreen : Theme.PillRed,
+                    Tag = t,
+                };
             }));
             list.SelectedIndex = Session.Cfg.Programas.IndexOf(current);
             list.Invalidate();
@@ -147,23 +359,31 @@ namespace Diagnostico
             remove.Invalidate();
         }
 
-        void ShowTool(ToolConfig t)
+        void ShowTool(ToolConfig t, bool forceSiteMode = false)
         {
             current = t;
             loading = true;
+            isSiteMode = t != null && !t.IsInternal && (forceSiteMode || t.IsUrl);
+            ClearExtraUrlRows();
             bool on = t != null;
             foreach (Control c in detail.Controls) c.Enabled = on;
             if (t != null)
             {
+                autoName = ToolConfig.AutoName(t.Exe, t.ExtraUrls());
+                autoFile = ToolConfig.AutoFileCode(t.Nome);
+                if (string.IsNullOrWhiteSpace(t.Arquivo) && !string.IsNullOrEmpty(autoFile))
+                    t.Arquivo = autoFile;
                 name.Text = t.Nome; exe.Text = t.Exe; desc.Text = t.Descricao; args.Text = t.Argumentos; proc.Text = t.Processo;
                 wait.Text = t.Espera.ToString(); mode.Value = t.Modo; win.Value = t.Janela;
                 enabledCheck.Checked = !t.Desativado;
                 maxBefore.Checked = t.MaximizarAntesPrint; quick.Checked = t.ModoRapido; stress.Checked = t.SoEstresse; periph.Checked = t.SoPerifericos;
                 conditional.Checked = t.Condicional; file.Text = t.Arquivo; minTime.Text = t.MinutosMinimos.ToString();
-                exe.ReadOnly = t.IsInternal;
-                locate.Enabled = !t.IsInternal;
-                exeLbl.Text = t.IsInternal ? "Recurso interno (fixo do sistema)" : "Executável ou site (https://...)";
+                if (isSiteMode)
+                    foreach (var u in t.ExtraUrls())
+                        AddExtraUrlRow(u, false);
             }
+            else { autoName = ""; autoFile = ""; }
+            UpdateSiteControls();
             loading = false;
             UpdateActionButtons();
             list.SelectedIndex = Session.Cfg.Programas.IndexOf(t);
@@ -198,7 +418,7 @@ namespace Diagnostico
             if (current == null || current.IsInternal) return;
             using (var dlg = new OpenFileDialog { Filter = "Programas|*.exe;*.bat;*.cmd|Todos|*.*", Title = "Executável de " + current.Nome })
             {
-                try { dlg.InitialDirectory = current.Exists ? Path.GetDirectoryName(current.FullPath) : Session.Cfg.ToolsRoot; } catch { }
+                try { dlg.InitialDirectory = current.Exists && !current.IsUrl ? Path.GetDirectoryName(current.FullPath) : Session.Cfg.ToolsRoot; } catch { }
                 if (dlg.ShowDialog(this) != DialogResult.OK) return;
                 string rel = AppPaths.ToRelative(dlg.FileName);
                 var preset = ToolDiscovery.MatchPreset(dlg.FileName, Session.Cfg.Programas, current);
@@ -211,7 +431,14 @@ namespace Diagnostico
                     Toast.Show("Pré-configuração aplicada: " + current.Nome + (current.Modo == "automatico" ? " (modo automático ⚡)" : ""));
                     return;
                 }
+                isSiteMode = false;
+                ClearExtraUrlRows();
+                UpdateSiteControls();
                 exe.Text = rel;
+                ApplyAutoName(false);
+                Session.Cfg.Save();
+                RefreshList();
+                PerformLayout();
             }
         }
 
@@ -241,15 +468,18 @@ namespace Diagnostico
 
         void Add()
         {
-            var items = new List<Tuple<string, Action>>();
+            var items = new List<Tuple<string, Action>>
+            {
+                UI.Item("Programa (.exe, .bat)...", AddCustomProgram),
+                UI.Item("Site de teste (URL)...", AddCustomSite),
+                null,
+            };
             foreach (var p in AppConfig.PresetTools())
             {
                 var preset = p;
                 string label = preset.Nome + (preset.Modo == "automatico" ? "  (automático ⚡)" : "");
                 items.Add(UI.Item(label, () => AddPreset(preset)));
             }
-            items.Add(null);
-            items.Add(UI.Item("Outro programa (.exe, .bat ou site)...", AddCustom));
             var menu = UI.Menu(items.ToArray());
             menu.Show(add, new Point(0, -menu.PreferredSize.Height - 2));
         }
@@ -275,17 +505,30 @@ namespace Diagnostico
             if (!t.Exists) Locate();
         }
 
-        void AddCustom()
+        void AddCustomProgram()
         {
             var t = new ToolConfig { Nome = "Novo programa", Exe = "", ModoRapido = false };
             Session.Cfg.Programas.Add(t);
             Session.Cfg.Save();
             RefreshList();
-            ShowTool(t);
+            ShowTool(t, false);
             Locate();
-            if (string.IsNullOrWhiteSpace(t.Nome) || t.Nome == "Novo programa")
-                if (!string.IsNullOrEmpty(t.Exe)) name.Text = Path.GetFileNameWithoutExtension(ToolDiscovery.FileNameOf(t.Exe));
-            name.Focus(); name.SelectAll();
+            ApplyAutoName(false);
+            Session.Cfg.Save();
+            RefreshList();
+            name.Box.Focus();
+            name.Box.SelectAll();
+        }
+
+        void AddCustomSite()
+        {
+            var t = new ToolConfig { Nome = "Novo site", Exe = "https://", Modo = "manual", SoPerifericos = true };
+            Session.Cfg.Programas.Add(t);
+            Session.Cfg.Save();
+            RefreshList();
+            ShowTool(t, true);
+            exe.Box.Focus();
+            exe.Box.SelectAll();
         }
 
         void Remove()
@@ -341,40 +584,85 @@ namespace Diagnostico
             int dx = pad + lw + gap, dw = Width - dx - pad;
             detail.SetBounds(dx, y0, dw, bottom - y0);
             int scrollY = detail.AutoScrollPosition.Y;
-            int x = ip, w = dw - ip * 2 - SystemInformation.VerticalScrollBarWidth, y = Theme.S(22) + scrollY;
-            name.SetBounds(x, y + Theme.S(6), Math.Max(Theme.S(120), w - Theme.S(140)), Theme.S(34)); y += Theme.S(56);
-            y += Theme.S(8);
+            int x = ip, w = dw - ip * 2 - SystemInformation.VerticalScrollBarWidth, y = Theme.S(12) + scrollY;
+            nameLbl.SetBounds(x, y, Math.Max(Theme.S(120), w - Theme.S(150)), Theme.S(26)); y += Theme.S(28);
+            name.SetBounds(x, y, w, ih); y += ih + Theme.S(24);
 
-            int ow = open.PreferredWidth, lw2 = locate.PreferredWidth;
+            int ow = open.PreferredWidth;
             exeLbl.SetBounds(x, y, w, Theme.S(26)); y += Theme.S(28);
             open.SetBounds(x + w - ow, y, ow, ih);
-            locate.SetBounds(open.Left - Theme.S(16) - lw2, y, lw2, ih);
-            exe.SetBounds(x, y, locate.Left - Theme.S(16) - x, ih); y += ih + Theme.S(10);
+            FlatButton actionBtn = isSiteMode ? addUrl : (IsExternalExe ? locate : null);
+            if (actionBtn != null && actionBtn.Visible)
+            {
+                int aw2 = actionBtn.PreferredWidth;
+                actionBtn.SetBounds(open.Left - Theme.S(12) - aw2, y, aw2, ih);
+                exe.SetBounds(x, y, actionBtn.Left - Theme.S(12) - x, ih);
+            }
+            else
+            {
+                exe.SetBounds(x, y, open.Left - Theme.S(12) - x, ih);
+            }
+            y += ih + Theme.S(12);
 
-            int g = Theme.S(16), cw = (w - g * 3) / 4;
-            modeLbl.SetBounds(x, y, cw, Theme.S(26)); winLbl.SetBounds(x + cw + g, y, cw, Theme.S(26));
-            waitLbl.SetBounds(x + (cw + g) * 2, y, cw, Theme.S(26)); minLbl.SetBounds(x + (cw + g) * 3, y, cw, Theme.S(26)); y += Theme.S(28);
-            mode.SetBounds(x, y, cw, ih); win.SetBounds(x + cw + g, y, cw, ih);
-            wait.SetBounds(x + (cw + g) * 2, y, cw, ih); minTime.SetBounds(x + (cw + g) * 3, y, cw, ih); y += ih + Theme.S(14);
+            foreach (var row in extraUrls)
+            {
+                int rw = row.Item2.PreferredWidth;
+                row.Item2.SetBounds(x + w - rw, y, rw, ih);
+                row.Item1.SetBounds(x, y, row.Item2.Left - Theme.S(12) - x, ih);
+                y += ih + Theme.S(10);
+            }
 
-            // checkboxes em fluxo
-            int cx = x, ch = Theme.S(34);
-            foreach (var c in new[] { enabledCheck, maxBefore, quick, stress, periph, conditional })
+            bool extExe = IsExternalExe;
+            if (extExe)
+            {
+                int g = Theme.S(16), cw = (w - g * 3) / 4;
+                modeLbl.SetBounds(x, y, cw, Theme.S(26)); winLbl.SetBounds(x + cw + g, y, cw, Theme.S(26));
+                waitLbl.SetBounds(x + (cw + g) * 2, y, cw, Theme.S(26)); minLbl.SetBounds(x + (cw + g) * 3, y, cw, Theme.S(26)); y += Theme.S(28);
+                mode.SetBounds(x, y, cw, ih); win.SetBounds(x + cw + g, y, cw, ih);
+                wait.SetBounds(x + (cw + g) * 2, y, cw, ih); minTime.SetBounds(x + (cw + g) * 3, y, cw, ih); y += ih + Theme.S(14);
+            }
+
+            // Grupo 1: Comportamento da etapa (ToggleSwitch Ativado/Desativado + Condicional + Maximizar antes do print)
+            int ch = Theme.S(34);
+            behaviorLbl.SetBounds(x, y, w, Theme.S(24)); y += Theme.S(26);
+            int cx = x;
+            foreach (var c in new Control[] { enabledCheck, conditional, maxBefore })
+            {
+                if (!c.Visible) continue;
+                int pw = (c is ToggleSwitch ? ((ToggleSwitch)c).PreferredWidth : ((DarkCheck)c).PreferredWidth) + Theme.S(8);
+                if (cx + pw > x + w && cx > x) { cx = x; y += ch + Theme.S(8); }
+                c.SetBounds(cx, y, pw, ch);
+                cx += pw + Theme.S(20);
+            }
+            y += ch + Theme.S(14);
+
+            // Grupo 2: Modos de análise em que entra
+            modesLbl.SetBounds(x, y, w, Theme.S(24)); y += Theme.S(26);
+            cx = x;
+            foreach (var c in new[] { quick, stress, periph })
             {
                 int pw = c.PreferredWidth + Theme.S(8);
                 if (cx + pw > x + w && cx > x) { cx = x; y += ch + Theme.S(8); }
                 c.SetBounds(cx, y, pw, ch);
-                cx += pw + Theme.S(16);
+                cx += pw + Theme.S(20);
             }
             y += ch + Theme.S(14);
 
             descLbl.SetBounds(x, y, w, Theme.S(26)); y += Theme.S(28);
-            desc.SetBounds(x, y, w, ih); y += ih + Theme.S(10);
-            int tw = (w - Theme.S(16) * 2) / 3;
-            fileLbl.SetBounds(x, y, tw, Theme.S(26)); argsLbl.SetBounds(x + tw + Theme.S(16), y, tw, Theme.S(26));
-            procLbl.SetBounds(x + (tw + Theme.S(16)) * 2, y, tw, Theme.S(26)); y += Theme.S(28);
-            file.SetBounds(x, y, tw, ih); args.SetBounds(x + tw + Theme.S(16), y, tw, ih);
-            proc.SetBounds(x + (tw + Theme.S(16)) * 2, y, tw, ih);
+            desc.SetBounds(x, y, w, ih); y += ih + Theme.S(12);
+            if (extExe)
+            {
+                int tw = (w - Theme.S(16) * 2) / 3;
+                fileLbl.SetBounds(x, y, tw, Theme.S(26)); argsLbl.SetBounds(x + tw + Theme.S(16), y, tw, Theme.S(26));
+                procLbl.SetBounds(x + (tw + Theme.S(16)) * 2, y, tw, Theme.S(26)); y += Theme.S(28);
+                file.SetBounds(x, y, tw, ih); args.SetBounds(x + tw + Theme.S(16), y, tw, ih);
+                proc.SetBounds(x + (tw + Theme.S(16)) * 2, y, tw, ih);
+            }
+            else
+            {
+                fileLbl.SetBounds(x, y, w, Theme.S(26)); y += Theme.S(28);
+                file.SetBounds(x, y, w, ih);
+            }
             detail.AutoScrollMinSize = new Size(0, y + ih + ip - scrollY);
         }
 

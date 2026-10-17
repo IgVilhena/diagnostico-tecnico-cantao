@@ -149,10 +149,8 @@ namespace Diagnostico
                 }
                 if (t.IsUrl)
                 {
-                    Process.Start(new ProcessStartInfo(t.FullPath) { UseShellExecute = true });
-                    foreach (var extra in (t.Argumentos ?? "").Split(new[] { ' ', ';', ',' }, StringSplitOptions.RemoveEmptyEntries))
-                        if (extra.StartsWith("http", StringComparison.OrdinalIgnoreCase))
-                            Process.Start(new ProcessStartInfo(extra) { UseShellExecute = true });
+                    foreach (var url in t.AllUrls())
+                        Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
                     launchedAt[t] = DateTime.Now;
                     return;
                 }

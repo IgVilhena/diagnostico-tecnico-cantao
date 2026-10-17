@@ -25,7 +25,7 @@ namespace Diagnostico
         protected override void OnLostFocus(EventArgs e) { base.OnLostFocus(e); Invalidate(); }
         protected override void OnKeyDown(KeyEventArgs e)
         {
-            if ((this is FlatButton || this is DarkSelect || this is DarkCheck) &&
+            if ((this is FlatButton || this is DarkSelect || this is DarkCheck || this is ToggleSwitch) &&
                 (e.KeyCode == Keys.Enter || e.KeyCode == Keys.Space))
             {
                 e.Handled = true; e.SuppressKeyPress = true; OnClick(EventArgs.Empty);
@@ -304,6 +304,79 @@ namespace Diagnostico
             DrawBox(g, new Rectangle(0, (Height - s) / 2, s, s), isChecked);
             TextRenderer.DrawText(g, Text, Font, new Rectangle(s + Theme.S(6), 0, Width, Height), Theme.Text,
                 TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
+            if (Focused) ControlPaint.DrawFocusRectangle(g, ClientRectangle, Theme.Text, ParentColor);
+        }
+    }
+
+    // Chave liga/desliga (Toggle Switch) com rótulo de estado (Ativado / Desativado).
+    public class ToggleSwitch : DrawnControl
+    {
+        bool isChecked;
+        public string OnText = "Ativado";
+        public string OffText = "Desativado";
+        public event EventHandler CheckedChanged;
+
+        public ToggleSwitch(string text, string onText = "Ativado", string offText = "Desativado")
+        {
+            Text = text;
+            OnText = onText;
+            OffText = offText;
+            Cursor = Cursors.Hand;
+            AccessibleRole = AccessibleRole.CheckButton;
+        }
+
+        public bool Checked
+        {
+            get { return isChecked; }
+            set { if (isChecked == value) return; isChecked = value; Invalidate(); if (CheckedChanged != null) CheckedChanged(this, EventArgs.Empty); }
+        }
+
+        string DisplayLabel
+        {
+            get
+            {
+                string state = isChecked ? OnText : OffText;
+                return string.IsNullOrEmpty(Text) ? state : Text + ": " + state;
+            }
+        }
+
+        public int PreferredWidth
+        {
+            get
+            {
+                string longest = string.IsNullOrEmpty(Text)
+                    ? (OnText.Length >= OffText.Length ? OnText : OffText)
+                    : Text + ": " + (OnText.Length >= OffText.Length ? OnText : OffText);
+                return Theme.S(54) + TextRenderer.MeasureText(longest, Font).Width;
+            }
+        }
+
+        protected override void OnClick(EventArgs e) { Checked = !Checked; base.OnClick(e); }
+
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            var g = e.Graphics;
+            g.Clear(ParentColor);
+            Theme.Smooth(g);
+            int tw = Theme.S(42), th = Theme.S(22);
+            int ty = (Height - th) / 2;
+            var track = new RectangleF(0, ty, tw, th);
+            if (isChecked)
+            {
+                Theme.FillRound(g, Theme.CheckBlue, track, th / 2f);
+            }
+            else
+            {
+                Theme.FillRound(g, Theme.Input, track, th / 2f);
+                Theme.DrawRound(g, Theme.Border, new RectangleF(0.5f, ty + 0.5f, tw - 1f, th - 1f), th / 2f, 1.2f);
+            }
+            int pad = Theme.S(3), d = th - pad * 2;
+            float kx = isChecked ? tw - pad - d : pad;
+            using (var b = new SolidBrush(isChecked ? Color.White : Theme.TextDim))
+                g.FillEllipse(b, kx, ty + pad, d, d);
+
+            TextRenderer.DrawText(g, DisplayLabel, Font, new Rectangle(tw + Theme.S(8), 0, Width - tw - Theme.S(8), Height),
+                isChecked ? Theme.Text : Theme.TextDim, TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
             if (Focused) ControlPaint.DrawFocusRectangle(g, ClientRectangle, Theme.Text, ParentColor);
         }
     }

@@ -125,6 +125,22 @@ public class UiSmoke
                 Snapshot(form, "config-rolagem");
                 var fileField = Field<DarkInput>(pages[4], "file");
                 Check(fileField.Bottom <= detail.ClientSize.Height, "Last configuration field is reachable");
+                Check(ToolConfig.AutoName(@"C:\Tools\DiskInfo64.exe") == "CrystalDiskInfo", "Auto name from preset exe");
+                Check(ToolConfig.AutoName(@"C:\Tools\Prime95_x64.exe") == "Prime95", "Auto name from custom exe");
+                Check(ToolConfig.AutoName("https://www.testarteclado.com.br", new[] { "https://pt.mictests.com" }) == "Testarteclado + Mictests", "Auto name from URLs");
+                pages[4].GetType().GetMethod("AddCustomSite", BindingFlags.Instance | BindingFlags.NonPublic).Invoke(pages[4], null);
+                var exeField = Field<DarkInput>(pages[4], "exe");
+                var nameField = Field<DarkInput>(pages[4], "name");
+                exeField.Text = "https://www.testarteclado.com.br";
+                Check(nameField.Text == "Testarteclado", "Typing URL auto-fills stage name");
+                pages[4].GetType().GetMethod("AddExtraUrlRow", BindingFlags.Instance | BindingFlags.NonPublic).Invoke(pages[4], new object[] { "https://pt.mictests.com", false });
+                var extraUrls = Field<System.Collections.Generic.List<Tuple<DarkInput, FlatButton>>>(pages[4], "extraUrls");
+                Check(extraUrls.Count == 1, "Extra URL row added");
+                extraUrls[0].Item1.Text = "https://pt.webcamtests.com";
+                Check(nameField.Text == "Testarteclado + Webcamtests", "Adding second URL updates auto-filled stage name");
+                Check(fileField.Text == "PRINT_Testarteclado_Webcamtests", "Evidence file code auto-fills from stage name");
+                var enabledSwitch = Field<ToggleSwitch>(pages[4], "enabledCheck");
+                Check(enabledSwitch.Checked, "New stage starts active in ToggleSwitch");
                 form.CloseFromButton();
                 foreach (var page in pages) if (page != null && !page.IsDisposed) page.Dispose();
             }
