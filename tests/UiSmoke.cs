@@ -141,6 +141,14 @@ public class UiSmoke
                 Check(fileField.Text == "PRINT_Testarteclado_Webcamtests", "Evidence file code auto-fills from stage name");
                 var enabledSwitch = Field<ToggleSwitch>(pages[4], "enabledCheck");
                 Check(enabledSwitch.Checked, "New stage starts active in ToggleSwitch");
+                Check(AppUpdater.IsNewerVersion("0.5.0", "v0.6.0") && !AppUpdater.IsNewerVersion("0.5.0", "v0.5.0") && !AppUpdater.IsNewerVersion("0.5.0", "v0.4.9"), "Version comparison");
+                var parsedRel = AppUpdater.ParseReleaseJson("{\"tag_name\":\"v0.6.0\",\"assets\":[{\"name\":\"DiagnosticoTecnico.exe\",\"browser_download_url\":\"https://example.com/DiagnosticoTecnico.exe\"}]}", "0.5.0");
+                Check(parsedRel != null && parsedRel.Version == "0.6.0" && parsedRel.DownloadUrl.EndsWith("DiagnosticoTecnico.exe"), "Parse GitHub release JSON");
+                var titleBar = (Control)typeof(MainForm).GetField("titleBar", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(form);
+                var updateBtn = Field<FlatButton>(titleBar, "updateButton");
+                Check(!updateBtn.Visible, "Update button hidden when no update available");
+                titleBar.GetType().GetMethod("SetUpdateAvailable").Invoke(titleBar, new object[] { parsedRel });
+                Check(updateBtn.Visible && updateBtn.Text == "Atualizar (v0.6.0)", "Update button visible next to theme button when release available");
                 form.CloseFromButton();
                 foreach (var page in pages) if (page != null && !page.IsDisposed) page.Dispose();
             }

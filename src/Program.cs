@@ -5,7 +5,7 @@ using System.Windows.Forms;
 
 [assembly: System.Reflection.AssemblyTitle("Diagnóstico Técnico")]
 [assembly: System.Reflection.AssemblyProduct("Diagnóstico Técnico")]
-[assembly: System.Reflection.AssemblyVersion("1.0.0.0")]
+[assembly: System.Reflection.AssemblyVersion("0.5.0.0")]
 
 namespace Diagnostico
 {
@@ -33,9 +33,16 @@ namespace Diagnostico
             {
                 if (!created)
                 {
+                    try { created = mutex.WaitOne(2500, false); }
+                    catch (AbandonedMutexException) { created = true; }
+                }
+                if (!created)
+                {
                     MessageBox.Show("O Diagnóstico Técnico já está aberto.", "Diagnóstico Técnico", MessageBoxButtons.OK, MessageBoxIcon.Information);
                     return;
                 }
+
+                AppUpdater.CleanupOldBinary();
 
                 try { Native.SetProcessDPIAware(); } catch { }
                 Application.EnableVisualStyles();

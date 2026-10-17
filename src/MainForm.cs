@@ -146,6 +146,15 @@ namespace Diagnostico
                                       : "Atalhos F8/F9 indisponíveis (usados por outro programa)";
             try { int round = 2; Native.DwmSetWindowAttribute(Handle, 33, ref round, 4); } catch { }
             try { int dark = Theme.IsDark ? 1 : 0; Native.DwmSetWindowAttribute(Handle, 20, ref dark, 4); } catch { }
+            if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable("DIAG_UI_TEST_DIR")))
+                CheckForUpdates();
+        }
+
+        async void CheckForUpdates()
+        {
+            var release = await AppUpdater.CheckForUpdateAsync();
+            if (release != null && !IsDisposed && IsHandleCreated)
+                titleBar.SetUpdateAvailable(release);
         }
 
         bool closeByButton;
@@ -173,13 +182,15 @@ namespace Diagnostico
 
         protected override void OnFormClosed(FormClosedEventArgs e)
         {
-            try { Microsoft.Win32.SystemEvents.UserPreferenceChanged -= SystemThemeChanged; } catch { }
+            try { Microsoft.Win32.SystemEvents.UserPreferenceChanged -= SystemEventsChanged; } catch { }
             Native.UnregisterHotKey(Handle, 1);
             Native.UnregisterHotKey(Handle, 2);
             var p = current as IPage;
             if (p != null) p.OnLeave();
             base.OnFormClosed(e);
         }
+
+        void SystemEventsChanged(object sender, Microsoft.Win32.UserPreferenceChangedEventArgs e) { SystemThemeChanged(sender, e); }
 
         static async void PrintFromHotkey(bool screen) { await Session.HotkeyPrint(screen); }
 
@@ -245,6 +256,8 @@ namespace Diagnostico
         int downBtn = -1;
         string pageTitle = "", hint = "";
         readonly FlatButton themeButton;
+        readonly FlatButton updateButton;
+        UpdateReleaseInfo pendingUpdate;
 
         public string PageTitle { get { return pageTitle; } set { pageTitle = value ?? ""; Invalidate(); } }
         public string Hint { get { return hint; } set { hint = value ?? ""; Invalidate(); } }
@@ -255,9 +268,44 @@ namespace Diagnostico
             BackColor = Theme.TitleBar;
             themeButton = new FlatButton("") { Font = Theme.Small, AccessibleName = "Alternar entre modo claro e escuro" };
             themeButton.Click += (s, e) => form.ToggleTheme();
+            updateButton = new FlatButton("Atualizar", true) { Font = Theme.Small, Visible = false, AccessibleName = "Atualizar para a nova versão" };
+            updateButton.Click += async (s, e) => await ApplyUpdate();
             Controls.Add(themeButton);
+            Controls.Add(updateButton);
             UpdateAppearance();
             form.Resize += (s, e) => Invalidate();   // troca o ícone maximizar/restaurar
+        }
+
+        public void SetUpdateAvailable(UpdateReleaseInfo release)
+        {
+            pendingUpdate = release;
+            if (release != null)
+            {
+                updateButton.Text = string.IsNullOrEmpty(release.Version) ? "Atualizar" : "Atualizar (v" + release.Version + ")";
+                updateButton.Enabled = true;
+                updateButton.Visible = true;
+            }
+            else
+            {
+                updateButton.Visible = false;
+            }
+            PerformLayout();
+            Invalidate();
+        }
+
+        async System.Threading.Tasks.Task ApplyUpdate()
+        {
+            if (pendingUpdate == null || !updateButton.Enabled) return;
+            updateButton.Enabled = false;
+            updateButton.Text = "Atualizando...";
+            PerformLayout();
+            bool ok = await AppUpdater.DownloadAndApplyAsync(pendingUpdate, form);
+            if (!ok && !IsDisposed)
+            {
+                updateButton.Enabled = true;
+                updateButton.Text = string.IsNullOrEmpty(pendingUpdate.Version) ? "Atualizar" : "Atualizar (v" + pendingUpdate.Version + ")";
+                PerformLayout();
+            }
         }
 
         public void UpdateAppearance() { themeButton.Text = Theme.IsDark ? "Modo claro" : "Modo escuro"; Invalidate(); }
@@ -266,6 +314,11 @@ namespace Diagnostico
         {
             base.OnLayout(e);
             if (themeButton != null) themeButton.SetBounds(Width - Theme.S(288), Theme.S(7), Theme.S(120), Height - Theme.S(14));
+            if (updateButton != null && themeButton != null)
+            {
+                int uw = Math.Max(Theme.S(110), updateButton.PreferredWidth);
+                updateButton.SetBounds(themeButton.Left - Theme.S(10) - uw, Theme.S(7), uw, Height - Theme.S(14));
+            }
         }
 
         // Botões no estilo do Windows: 0 = minimizar, 1 = maximizar/restaurar, 2 = fechar
@@ -350,7 +403,7 @@ namespace Diagnostico
                 x += Theme.S(18);
                 TextRenderer.DrawText(g, pageTitle, Theme.BodyBold, new Rectangle(x, 0, Theme.S(320), Height), Theme.Text, flags);
             }
-            int right = themeButton.Left - Theme.S(16);
+            int right = (updateButton != null && updateButton.Visible ? updateButton.Left : themeButton.Left) - Theme.S(16);
             if (Session.Cfg.MostrarDicas && hint != "" && right - Theme.S(520) > x + Theme.S(200))
                 TextRenderer.DrawText(g, hint, Theme.Small, new Rectangle(right - Theme.S(520), 0, Theme.S(520), Height), Theme.TextDim,
                     flags | TextFormatFlags.Right);
